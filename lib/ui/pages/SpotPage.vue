@@ -196,6 +196,26 @@
                 <p class='sp-count'>
                     {{ countLine }}
                 </p>
+                <p
+                    v-if='rows.length'
+                    class='sp-hint mt-0 mb-2'
+                >
+                    Zoom shows a temporary marker only you see. Add to Map creates a CloudTAK marker linking to the
+                    forecast: into the active DataSync if one is active, otherwise My Features until you share it.
+                </p>
+                <div
+                    v-if='spotMarker.id'
+                    class='sp-temp'
+                >
+                    <span class='sp-temp-text'>Zoom marker: {{ spotMarker.name }}</span>
+                    <button
+                        class='btn btn-sm btn-outline-secondary'
+                        type='button'
+                        @click='clearSpotMarker'
+                    >
+                        Clear
+                    </button>
+                </div>
                 <div
                     v-for='row in visibleRows'
                     :key='row.id'
@@ -231,7 +251,34 @@
                         >
                             Zoom
                         </button>
+                        <button
+                            class='btn btn-sm btn-outline-secondary'
+                            type='button'
+                            :disabled='addedSpots.busy[row.id]'
+                            @click='addToMap(row)'
+                        >
+                            {{ addedSpots.result[row.id] ? 'Update on Map' : 'Add to Map' }}
+                        </button>
                     </div>
+                    <div
+                        v-if='addedSpots.result[row.id]'
+                        class='sp-added'
+                    >
+                        <span>{{ addedLine(row) }}</span>
+                        <button
+                            class='btn btn-sm btn-link p-0'
+                            type='button'
+                            @click='openCot(addedSpots.result[row.id].cotId)'
+                        >
+                            Open marker
+                        </button>
+                    </div>
+                    <p
+                        v-if='addedSpots.error[row.id]'
+                        class='text-danger small mb-0 mt-1'
+                    >
+                        {{ addedSpots.error[row.id] }}
+                    </p>
                 </div>
                 <p
                     v-if='rows.length > visibleRows.length'
@@ -274,6 +321,8 @@ import { setSpotFilter, state, type SpotScope } from '../../core/state.ts';
 import { formatInTimeZone } from '../../core/timezone.ts';
 import { convertLength } from '../../core/units.ts';
 import { openLinkWindow } from '../../layers/feature-popup.ts';
+import { addSpotToMap, addedSpots, openCot } from '../../spot/spot-cot.ts';
+import { clearSpotMarker, showSpotMarker, spotMarker } from '../../spot/spot-marker.ts';
 import {
     NEW_REQUEST_URL,
     SPOT_CATEGORIES,
@@ -294,6 +343,7 @@ const MAX_ROWS = 200;
 const TICK_MS = 30_000;
 
 const radii = SPOT_RADII_MI;
+
 const categories = SPOT_CATEGORIES;
 
 /** Ticks so age labels stay current; also re-checks the 5-minute cache. */
@@ -492,9 +542,32 @@ function openOffice(): void {
     if (activeOffice.value) openLinkWindow(officeUrl(activeOffice.value));
 }
 
+function addedLine(row: SpotRow): string {
+    const r = addedSpots.result[row.id];
+    if (!r) return '';
+    return r.inMission
+        ? 'On the map in the active DataSync.'
+        : 'On the map in My Features — use Share to send it.';
+}
+
+async function addToMap(row: SpotRow): Promise<void> {
+    addedSpots.busy[row.id] = true;
+    delete addedSpots.error[row.id];
+    try {
+        addedSpots.result[row.id] = await addSpotToMap(row);
+        // The real marker replaces the temporary one for this request.
+        if (spotMarker.id === row.id) clearSpotMarker();
+    } catch (e) {
+        addedSpots.error[row.id] = e instanceof Error ? e.message : 'Could not add the marker';
+    } finally {
+        addedSpots.busy[row.id] = false;
+    }
+}
+
 function zoomTo(row: SpotRow): void {
     const map = mapOf();
     if (!map?.flyTo) return;
+    showSpotMarker(row);
     map.flyTo({
         center: [row.lon, row.lat],
         zoom: Math.max(map.getZoom?.() ?? 0, 10),
@@ -598,6 +671,27 @@ function zoomTo(row: SpotRow): void {
     display: flex;
     gap: 0.4rem;
     margin-top: 0.4rem;
+}
+.sp-temp {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin: 0 0 0.5rem;
+    font-size: 0.8rem;
+}
+.sp-temp-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+.sp-added {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: 0.35rem;
+    font-size: 0.8rem;
+    color: var(--tblr-secondary, inherit);
 }
 .sp-badge {
     flex-shrink: 0;

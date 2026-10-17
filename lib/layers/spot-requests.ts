@@ -46,7 +46,7 @@ let moveTimer: ReturnType<typeof setTimeout> | null = null;
 let moveHandler: (() => void) | null = null;
 let stopWatch: WatchStopHandle | null = null;
 
-/** Popup card for a spot request feature. */
+/** Popup card for a spot request feature (also used by the temporary Zoom marker). */
 export function spotDetailHtml(props: Record<string, unknown>): string {
     const id = String(props.id || '');
     const tz = String(props.timeZone || '');
@@ -91,7 +91,7 @@ function inView(map: LiveWxMap, lat: number, lon: number): boolean {
     return false;
 }
 
-/** GeoJSON properties for a spot request. */
+/** GeoJSON properties for a spot request (map layer and temporary marker). */
 export function spotFeatureProps(r: SpotRequest): Record<string, unknown> {
     return {
         id: r.id,
