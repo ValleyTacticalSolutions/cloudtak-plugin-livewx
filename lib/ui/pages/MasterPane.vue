@@ -335,11 +335,30 @@
                 </div>
             </div>
         </section>
+
+        <section class='sec'>
+            <div class='sec-head'>
+                <h3 class='sec-title'>
+                    Spot Forecasts
+                </h3>
+                <button
+                    class='btn btn-sm btn-outline-secondary'
+                    type='button'
+                    @click='go("spot")'
+                >
+                    Open
+                </button>
+            </div>
+            <p class='sec-meta mb-0'>
+                {{ spotLine }}
+            </p>
+        </section>
     </div>
 </template>
 
 <script setup lang='ts'>
 import { computed, onMounted } from 'vue';
+import { ageLabelMs } from '../../core/egress.ts';
 import { setLightningStaleSec, setPage, state } from '../../core/state.ts';
 import { forecast } from '../../forecast/engine.ts';
 import { listSources } from '../../forecast/sources.ts';
@@ -355,6 +374,7 @@ import {
     setLayerEnabled,
     setLayerOpacity,
 } from '../../layers/registry.ts';
+import { filterSpotRequests, spot } from '../../spot/spot.ts';
 
 const rainWindows = RAIN_TOTAL_WINDOWS;
 
@@ -383,6 +403,7 @@ const moreRows = [
     { id: 'avalanche', label: 'Avalanche', opacity: false },
     { id: 'snow_depth', label: 'Snow Depth', opacity: true },
     { id: 'earthquakes', label: 'Earthquakes', opacity: false },
+    { id: 'spot_requests', label: 'Spot Forecasts', opacity: false },
 ];
 
 const allIds = [
@@ -428,6 +449,25 @@ const forecastLine = computed(() => {
     return `${name} · ${place}`;
 });
 
+/** Summary from the cached list only; the home pane never fetches it. */
+const spotLine = computed(() => {
+    if (spot.fetchedAt == null) return 'Not loaded';
+    const office = state.spotOffice || spot.autoOffice;
+    const n = filterSpotRequests(spot.requests, {
+        scope: state.spotScope,
+        office,
+        radiusMi: state.spotRadiusMi,
+        lat: state.queryLat,
+        lon: state.queryLon,
+        category: state.spotCategory,
+        hideComplete: state.spotHideComplete,
+    }).length;
+    const where = state.spotScope === 'office'
+        ? (office || 'No office')
+        : state.spotScope === 'radius' ? `Within ${state.spotRadiusMi} mi` : 'All offices';
+    return `${where} · ${n} active · updated ${ageLabelMs(spot.fetchedAt)}`;
+});
+
 onMounted(() => refreshAllStatuses());
 
 function pct(id: string): number {
@@ -455,7 +495,7 @@ function onRainWindow(ev: Event): void {
     setRainTotalsWindow((ev.target as HTMLSelectElement).value as RainTotalWindowId);
 }
 
-function go(page: 'forecast' | 'radar'): void {
+function go(page: 'forecast' | 'radar' | 'spot'): void {
     setPage(page);
 }
 

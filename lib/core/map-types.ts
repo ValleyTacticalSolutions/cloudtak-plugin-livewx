@@ -12,6 +12,7 @@ export type LiveWxMap = {
     setLayoutProperty?: (id: string, name: string, value: unknown) => void;
     getZoom?: () => number;
     getCenter?: () => { lat: number; lng: number };
+    flyTo?: (options: { center: [number, number]; zoom?: number }) => void;
     getBounds?: () => {
         getWest: () => number;
         getEast: () => number;

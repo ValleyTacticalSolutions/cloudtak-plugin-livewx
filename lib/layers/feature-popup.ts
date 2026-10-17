@@ -299,17 +299,24 @@ export function linkHtml(url: string, text = url): string {
     return `<a class="${LINK_CLASS}" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(text)}</a>`;
 }
 
+export type LinkWindowOpts = {
+    /** Window name; links sharing a name reuse one window. */
+    name?: string;
+    maxWidth?: number;
+    maxHeight?: number;
+};
+
 /** Open a URL in a small, centered, reused browser window (new tab where popups are unsupported). */
-export function openLinkWindow(url: string): void {
+export function openLinkWindow(url: string, opts: LinkWindowOpts = {}): void {
     const sw = window.screen?.availWidth || window.innerWidth;
     const sh = window.screen?.availHeight || window.innerHeight;
-    const width = Math.min(900, Math.round(sw * 0.8));
-    const height = Math.min(700, Math.round(sh * 0.8));
+    const width = Math.min(opts.maxWidth ?? 900, Math.round(sw * 0.8));
+    const height = Math.min(opts.maxHeight ?? 700, Math.round(sh * 0.8));
     const left = Math.max(0, Math.round((sw - width) / 2));
     const top = Math.max(0, Math.round((sh - height) / 2));
     const win = window.open(
         url,
-        LINK_WINDOW_NAME,
+        opts.name ?? LINK_WINDOW_NAME,
         `popup,width=${width},height=${height},left=${left},top=${top}`,
     );
     if (!win) {

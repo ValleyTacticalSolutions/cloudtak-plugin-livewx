@@ -17,6 +17,8 @@ import { isMosaic } from '../radar/sites.ts';
 
 export type PointMode = 'self' | 'center' | 'pick' | 'favorite';
 
+export type SpotScope = 'office' | 'radius' | 'all';
+
 export interface FavoritePoint {
     id: string;
     name: string;
@@ -66,6 +68,14 @@ export interface PersistedSettings {
     legendsVisible: boolean;
     /** Observed rain totals window: 1h | 6h | 24h | 72h | 7d */
     rainTotalsWindow: string;
+    /** Spot Forecasts page filters. */
+    spotScope: SpotScope;
+    spotRadiusMi: number;
+    /** Office override; '' = office for the query point. */
+    spotOffice: string;
+    /** Incident category; '' = all. */
+    spotCategory: string;
+    spotHideComplete: boolean;
 }
 
 export interface LiveWxState extends PersistedSettings {
@@ -106,13 +116,19 @@ function load(): PersistedSettings {
         consentedSources: [],
         legendsVisible: true,
         rainTotalsWindow: '24h',
+        spotScope: 'office',
+        spotRadiusMi: 50,
+        spotOffice: '',
+        spotCategory: '',
+        spotHideComplete: false,
     };
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return defaults;
         const parsed = JSON.parse(raw) as Partial<PersistedSettings>;
         const pageRaw = parsed.page as string | undefined;
-        const page: AppPageId = pageRaw === 'forecast' || pageRaw === 'radar' || pageRaw === 'home'
+        const page: AppPageId = pageRaw === 'forecast' || pageRaw === 'radar' || pageRaw === 'spot'
+            || pageRaw === 'home'
             ? pageRaw
             : 'home';
         return {
@@ -151,6 +167,11 @@ function load(): PersistedSettings {
             // Default on when key missing (first load after this feature).
             legendsVisible: parsed.legendsVisible === undefined ? true : Boolean(parsed.legendsVisible),
             rainTotalsWindow: normalizeRainWindow(parsed.rainTotalsWindow),
+            spotScope: normalizeSpotScope(parsed.spotScope),
+            spotRadiusMi: clamp(Number(parsed.spotRadiusMi), 1, 500, defaults.spotRadiusMi),
+            spotOffice: typeof parsed.spotOffice === 'string' ? parsed.spotOffice.toUpperCase() : '',
+            spotCategory: typeof parsed.spotCategory === 'string' ? parsed.spotCategory : '',
+            spotHideComplete: Boolean(parsed.spotHideComplete),
         };
     } catch {
         return defaults;
@@ -170,6 +191,10 @@ function parseRadarProvider(raw: unknown): RadarProvider {
 function normalizeRainWindow(raw: unknown): string {
     const allowed = new Set(['1h', '6h', '24h', '72h', '7d']);
     return typeof raw === 'string' && allowed.has(raw) ? raw : '24h';
+}
+
+function normalizeSpotScope(raw: unknown): SpotScope {
+    return raw === 'radius' || raw === 'all' ? raw : 'office';
 }
 
 function clamp(n: number, min: number, max: number, fallback: number): number {
@@ -237,6 +262,11 @@ function payload(): PersistedSettings {
         consentedSources: state.consentedSources,
         legendsVisible: state.legendsVisible,
         rainTotalsWindow: state.rainTotalsWindow,
+        spotScope: state.spotScope,
+        spotRadiusMi: state.spotRadiusMi,
+        spotOffice: state.spotOffice,
+        spotCategory: state.spotCategory,
+        spotHideComplete: state.spotHideComplete,
     };
 }
 
@@ -372,5 +402,17 @@ export function removeFavorite(id: string): void {
 export function selectFavorite(id: string): void {
     state.favoriteId = id;
     state.pointMode = 'favorite';
+    persist();
+}
+
+export function setSpotFilter(patch: Partial<Pick<
+    PersistedSettings,
+    'spotScope' | 'spotRadiusMi' | 'spotOffice' | 'spotCategory' | 'spotHideComplete'
+>>): void {
+    if (patch.spotScope !== undefined) state.spotScope = normalizeSpotScope(patch.spotScope);
+    if (patch.spotRadiusMi !== undefined) state.spotRadiusMi = clamp(patch.spotRadiusMi, 1, 500, 50);
+    if (patch.spotOffice !== undefined) state.spotOffice = patch.spotOffice.toUpperCase();
+    if (patch.spotCategory !== undefined) state.spotCategory = patch.spotCategory;
+    if (patch.spotHideComplete !== undefined) state.spotHideComplete = patch.spotHideComplete;
     persist();
 }
