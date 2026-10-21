@@ -1,4 +1,4 @@
-export type StyleLayer = { id: string; type: string };
+export type StyleLayer = { id: string; type: string; 'source-layer'?: string };
 
 export type LiveWxMap = {
     getLayer: (id: string) => unknown;

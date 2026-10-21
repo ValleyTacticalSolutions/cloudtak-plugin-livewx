@@ -20,7 +20,7 @@ import {
     refreshLightningView,
     restoreLightningLayers,
 } from '../lightning/lightning.ts';
-import type { LiveWxMap } from '../core/map-types.ts';
+import type { LiveWxMap, StyleLayer } from '../core/map-types.ts';
 import { mapOf as hostMapOf, registerModule, unregisterModule } from '../core/map-host.ts';
 import {
     FALLBACK_SITE_CODES,
@@ -65,11 +65,15 @@ export const replayFramesRef = ref<ScanFrame[]>([]);
 export const liveValidAt = ref<number | null>(null);
 let lastSourceSig = '';
 let filterRaf = 0;
+let raiseRaf = 0;
 let rainviewerHost: string | null = null;
 /** Resolved mosaic for the current provider + map center. */
 export const activeSource = ref<RadarSourceKind>('iem');
 let moveEndBound: (() => void) | null = null;
 let moveEndTimer: ReturnType<typeof setTimeout> | null = null;
+
+/** Opaque layer types a basemap can stack on top of the radar. */
+const COVERING_TYPES = new Set(['background', 'raster', 'hillshade', 'color-relief', 'fill-extrusion']);
 
 export function currentProduct(): RadarProduct | undefined {
     return getProduct(state.productId);
@@ -241,6 +245,47 @@ function applyTiles(map: LiveWxMap): void {
     }, map.getLayer(ALERT_LINE_ID) ? ALERT_LINE_ID : firstSymbolLayer(map));
     stackAlertLayers(map);
     raiseLightningLayer();
+}
+
+function coversRadar(layer: StyleLayer): boolean {
+    if (layer.id.startsWith('livewx-')) return false;
+    if (COVERING_TYPES.has(layer.type)) return true;
+    // Vector basemap land/water fills; CoT and GeoJSON fills have no source-layer
+    return layer.type === 'fill' && Boolean(layer['source-layer']);
+}
+
+/**
+ * CloudTAK swaps basemaps by removing and re-adding the overlay's layers
+ * (no style.load), which can land them above the radar. Lift the radar
+ * back over the highest covering layer.
+ */
+function keepRadarAboveBasemap(): void {
+    raiseRaf = 0;
+    if (!state.overlayEnabled) return;
+    const map = mapOf();
+    const layers = map?.getStyle?.()?.layers;
+    if (!map || !layers) return;
+    const radarIdx = layers.findIndex((l) => l.id === RADAR_LAYER_ID);
+    if (radarIdx < 0) return;
+    let top = -1;
+    for (let i = layers.length - 1; i > radarIdx; i--) {
+        if (coversRadar(layers[i])) {
+            top = i;
+            break;
+        }
+    }
+    if (top < 0) return;
+    try {
+        map.moveLayer?.(RADAR_LAYER_ID, layers[top + 1]?.id);
+        stackAlertLayers(map);
+        raiseLightningLayer();
+    } catch {
+        /* style not ready */
+    }
+}
+
+function onStyleData(): void {
+    if (!raiseRaf) raiseRaf = requestAnimationFrame(keepRadarAboveBasemap);
 }
 
 function ensureRadarLayer(map: LiveWxMap): void {
@@ -466,7 +511,10 @@ export async function init(api: PluginAPI): Promise<void> {
         restore: (map) => onStyle(map),
     });
     const map = mapOf();
-    if (map) attachRadarAgeControl(map);
+    if (map) {
+        attachRadarAgeControl(map);
+        map.on('styledata', onStyleData);
+    }
     if (state.alertsEnabled) startAlerts(api);
     if (state.sitesOnMap) startSiteMarkers(api, onSitePicked);
     if (state.lightningEnabled) applyLightning();
@@ -483,13 +531,20 @@ export function destroy(): void {
         cancelAnimationFrame(filterRaf);
         filterRaf = 0;
     }
+    if (raiseRaf) {
+        cancelAnimationFrame(raiseRaf);
+        raiseRaf = 0;
+    }
     stopAlerts();
     stopSiteMarkers();
     destroyLightning();
     unregisterModule('radar-core');
     const map = mapOf();
     detachMoveEnd(map);
-    if (map) removeRadarLayer(map);
+    if (map) {
+        try { map.off('styledata', onStyleData); } catch { /* ignore */ }
+        removeRadarLayer(map);
+    }
     detachRadarAgeControl();
     apiRef = null;
     void removeFilterProtocol();
