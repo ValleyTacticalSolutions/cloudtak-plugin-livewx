@@ -56,4 +56,4 @@ export const TDWR_RANGE_KM = 90;
 export const BLITZ_RELAY_PATH = '/api/livewx/lightning';
 
 /** In-plugin views: master home + detail screens with Back. */
-export type AppPageId = 'home' | 'forecast' | 'radar';
+export type AppPageId = 'home' | 'forecast' | 'radar' | 'spot';

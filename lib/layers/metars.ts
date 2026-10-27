@@ -7,6 +7,7 @@ import { fetchBytes } from '../core/egress.ts';
 import type { FeatureCollection } from '../core/geojson.ts';
 import type { LiveWxMap } from '../core/map-types.ts';
 import { firstSymbolLayer, mapOf } from '../core/map-host.ts';
+import { PLANE_TILT_ICON, ensureMapIcons, removeMapIcons } from '../core/map-icons.ts';
 import { state } from '../core/state.ts';
 import { formatStationLocal, timeZoneAt } from '../core/timezone.ts';
 import { convertPressure, convertTemp, type UnitSystem } from '../core/units.ts';
@@ -30,6 +31,11 @@ const BACKOFF_BASE_MS = 120_000;
 const BACKOFF_MAX_MS = 15 * 60_000;
 const SOURCE_ID = 'livewx-metar-src';
 const CIRCLE_ID = 'livewx-metar-circle';
+const ICON_ID = 'livewx-metar-icon';
+/** Circle + icon layers; clicks on either open the popup. */
+const POPUP_IDS = [CIRCLE_ID, ICON_ID];
+/** Station ID labels appear from this zoom (thousands of stations nationwide). */
+const LABEL_MIN_ZOOM = 6;
 
 const FLIGHT_COLORS = [
     'match',
@@ -361,12 +367,37 @@ function paint(map: LiveWxMap): void {
             type: 'circle',
             source: SOURCE_ID,
             paint: {
-                'circle-radius': 5,
+                'circle-radius': 11,
+                // Flight category colors (VFR / MVFR / IFR / LIFR / unknown).
                 'circle-color': FLIGHT_COLORS,
                 'circle-stroke-width': 1,
                 'circle-stroke-color': '#fff',
             },
         }, before);
+    }
+    // Style swaps drop images, so (re-)add the icon on every paint.
+    if (ensureMapIcons(map, [PLANE_TILT_ICON]) && !map.getLayer(ICON_ID)) {
+        map.addLayer({
+            id: ICON_ID,
+            type: 'symbol',
+            source: SOURCE_ID,
+            layout: {
+                'icon-image': PLANE_TILT_ICON.id,
+                'icon-allow-overlap': true,
+                'icon-ignore-placement': true,
+                // Station ID (e.g. KFLG); overlapping labels are hidden, the icon stays.
+                'text-field': ['step', ['zoom'], '', LABEL_MIN_ZOOM, ['get', 'id']],
+                'text-size': 12,
+                'text-offset': [0, 1.35],
+                'text-anchor': 'top',
+                'text-optional': true,
+            },
+            paint: {
+                'text-color': '#ffffff',
+                'text-halo-color': '#0f172a',
+                'text-halo-width': 1.5,
+            },
+        });
     }
 }
 
@@ -467,7 +498,7 @@ export function registerMetarLayer(): void {
         sends: 'Minute cache',
         start: async () => {
             running = true;
-            registerFeatureLayers([CIRCLE_ID], {
+            registerFeatureLayers(POPUP_IDS, {
                 label: 'METAR',
                 detailHtml: metarDetailHtml,
             });
@@ -486,10 +517,12 @@ export function registerMetarLayer(): void {
                 pollTimer = null;
             }
             unbindMove();
-            unregisterFeatureLayers([CIRCLE_ID]);
+            unregisterFeatureLayers(POPUP_IDS);
             const map = mapOf();
             if (map) {
+                removeLayerSafe(map, ICON_ID);
                 removeLayerSafe(map, CIRCLE_ID);
+                removeMapIcons(map, [PLANE_TILT_ICON]);
                 removeSourceSafe(map, SOURCE_ID);
             }
             allRows = [];
@@ -498,7 +531,7 @@ export function registerMetarLayer(): void {
         },
         restore: (map) => {
             if (!running) return;
-            registerFeatureLayers([CIRCLE_ID], {
+            registerFeatureLayers(POPUP_IDS, {
                 label: 'METAR',
                 detailHtml: metarDetailHtml,
             });

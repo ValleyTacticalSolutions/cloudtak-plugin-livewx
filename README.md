@@ -28,6 +28,13 @@ Requires CloudTAK **13.102** or newer. Apache-2.0 clean-room implementation (not
 - **Live lightning (Blitzortung)** via CloudTAK **server relay** (clients never open Blitzortung sockets)
 - **Lightning density (NOAA)** — GOES GLM WMS, Atmosphere-style delayed density
 
+### Spot Forecasts
+
+- **Read-only** list of current NWS Spot Forecast requests (the [Spot Forecast Monitor](https://spot.weather.gov/) list, via NOAA map services) — this office (from the forecast point), within a radius, or all offices; incident and hide-complete filters
+- Each request opens its official forecast page in a small window; **Zoom** flies the map to it
+- **Request a Spot Forecast** opens the official NWS request form in its own window — requests are submitted there, not from CloudTAK
+- Optional **Spot Forecasts** map layer (More) with a popup card linking to the forecast
+
 ### Layer catalog
 
 Foldable groups with consent dialogs, map keys, and status lines:
@@ -95,6 +102,7 @@ Symlink this checkout to `CloudTAK/app/plugins/livewx-radar`, copy or symlink `s
 - Radar: [Iowa Environmental Mesonet](https://mesonet.agron.iastate.edu/ogc/) (US NEXRAD), [Environment Canada GeoMet](https://geo.weather.gc.ca/) (Canada), [RainViewer](https://www.rainviewer.com/) (global)
 - Forecast / alerts / many layers: [NWS API](https://www.weather.gov/documentation/services-web-api) and NOAA map services
 - Open-Meteo: [open-meteo.com](https://open-meteo.com/) (CC BY 4.0)
+- Spot forecasts: [NOAA SPOT Forecast Monitor map service](https://mapservices.weather.noaa.gov/vector/rest/services/fire_weather/nws_fire_weather_spot/MapServer) (read-only, public, ~15 min updates); forecasts and requests open on [spot.weather.gov](https://spot.weather.gov/)
 - Lightning: [Blitzortung.org](https://www.blitzortung.org/) & contributors (CC BY-SA 4.0); display adapted from [cmlaird/CloudTAK-Plugin-Lightning](https://github.com/cmlaird/CloudTAK-Plugin-Lightning) (MIT)
 - Site list / product taxonomy adapted from [Supercell Wx](https://github.com/dpaulat/supercell-wx) (MIT)
 - Feature parity inspired by [takwerx/atmosphere](https://github.com/takwerx/atmosphere) (independent reimplementation)

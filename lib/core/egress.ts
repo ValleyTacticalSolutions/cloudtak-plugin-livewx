@@ -36,7 +36,6 @@ export const ALLOWED_HOSTS = new Set([
     'waterdata.usgs.gov',
     'earthquake.usgs.gov',
     'services.dat.noaa.gov',
-    'spot.weather.gov',
     'gacc.nifc.gov',
     'radar.weather.gov',
     'aviationweather.gov',
