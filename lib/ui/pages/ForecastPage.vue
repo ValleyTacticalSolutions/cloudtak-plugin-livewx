@@ -26,8 +26,12 @@
                 Click the map to set the forecast point.
             </p>
             <p class='fc-place'>
-                <template v-if='locationLine'>{{ locationLine }}</template>
-                <template v-else>No location set</template>
+                <template v-if='locationLine'>
+                    {{ locationLine }}
+                </template>
+                <template v-else>
+                    No location set
+                </template>
             </p>
         </section>
 

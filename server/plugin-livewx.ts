@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * CloudTAK server routes for LiveWX:
  *  - Blitzortung relay (clients never connect to Blitzortung directly)

@@ -219,8 +219,6 @@ export function chooseStep(
     north: number,
     maxPoints = MAX_POINTS,
 ): number {
-    const spanLon = Math.max(0.05, east - west);
-    const spanLat = Math.max(0.05, north - south);
     for (const step of STEPS) {
         const x0 = Math.max(LON_MIN, snapDown(west, step));
         const y0 = Math.max(LAT_MIN, snapDown(south, step));
