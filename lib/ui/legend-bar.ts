@@ -7,6 +7,7 @@ import { mapOf, registerModule } from '../core/map-host.ts';
 import { state } from '../core/state.ts';
 import { SURFACE_BG, SURFACE_BORDER, SURFACE_FG } from '../core/theme.ts';
 import type { UnitSystem } from '../core/units.ts';
+import { HIGH_FLOW_GRADES } from '../layers/high-flow.ts';
 import { getProduct } from '../radar/products.ts';
 import { activeSource } from '../radar/radar.ts';
 
@@ -21,6 +22,8 @@ export type LegendStrip = {
     min: LabelFn;
     max: LabelFn;
     mid?: LabelFn;
+    /** Discrete classes; when set, swatches replace the gradient and ticks. */
+    items?: Array<{ color: string; label: string }>;
 };
 
 /** Menu order from MasterPane (only ids with a legend appear). */
@@ -36,6 +39,10 @@ const MENU_ORDER = [
     'smoke',
     'air_quality',
     'flash_flood',
+    'flood_now',
+    'flood_5day',
+    'high_flow_now',
+    'high_flow_5day',
     'rain_gauges',
     'snow_depth',
 ] as const;
@@ -43,6 +50,39 @@ const MENU_ORDER = [
 const RAIN_COLORS = [
     '#0018ff', '#00a0ff', '#00ffc8', '#00e000', '#ffff00', '#ff9000', '#ff0000', '#ff00ff', '#ffffff',
 ];
+
+/** NWM flooded-ground fill, as drawn by the service. */
+const FLOOD_EXTENT_COLORS = ['#006ec8', '#006ec8'];
+
+/** Short swatch labels for the high-flow grades (same order as HIGH_FLOW_GRADES). */
+const HIGH_FLOW_SHORT: Record<string, string> = {
+    '2': '1-in-50 yr+',
+    '4': '1-in-25 yr',
+    '10': '1-in-10 yr',
+    '20': '1-in-5 yr',
+    '50': '1-in-2 yr',
+    '>50': 'High-water mark',
+    '': 'Size unknown',
+};
+
+/** One strip for both horizons, so turning on Now and 5 Days shows it once. */
+const HIGH_FLOW_LEGEND: LegendStrip = {
+    id: 'high_flow',
+    label: 'Streams Running High',
+    unit: 'flow rarity',
+    colors: [],
+    min: '',
+    max: '',
+    items: HIGH_FLOW_GRADES.map((g) => ({ color: g.color, label: HIGH_FLOW_SHORT[g.value] ?? g.label })),
+};
+
+const FLOOD_EXTENT_LEGEND: LegendStrip = {
+    id: 'flood_extent',
+    label: 'Flooded Ground',
+    colors: FLOOD_EXTENT_COLORS,
+    min: 'Modeled',
+    max: 'water over banks',
+};
 
 const LEGENDS: Record<string, LegendStrip> = {
     radar_overlay: {
@@ -186,6 +226,10 @@ const LEGENDS: Record<string, LegendStrip> = {
         mid: 'Moderate',
         max: 'High',
     },
+    flood_now: FLOOD_EXTENT_LEGEND,
+    flood_5day: FLOOD_EXTENT_LEGEND,
+    high_flow_now: HIGH_FLOW_LEGEND,
+    high_flow_5day: HIGH_FLOW_LEGEND,
     snow_depth: {
         id: 'snow_depth',
         label: 'Snow Depth',
@@ -199,7 +243,7 @@ const LEGENDS: Record<string, LegendStrip> = {
     },
 };
 
-const STYLE_ID = 'livewx-legend-bar-style-v2';
+const STYLE_ID = 'livewx-legend-bar-style-v3';
 
 let mapRef: LiveWxMap | null = null;
 let root: HTMLDivElement | null = null;
@@ -231,7 +275,7 @@ function activeStrips(): LegendStrip[] {
             continue;
         }
         const strip = LEGENDS[id];
-        if (strip) out.push(strip);
+        if (strip && !out.includes(strip)) out.push(strip);
     }
     return out;
 }
@@ -291,6 +335,25 @@ function ensureStyle(): void {
     opacity: 0.8;
     font-size: 8px;
 }
+.livewx-legend-items {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px 6px;
+    font-size: 8px;
+}
+.livewx-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    white-space: nowrap;
+}
+.livewx-legend-swatch {
+    flex: none;
+    width: 9px;
+    height: 6px;
+    border-radius: 1px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+}
 `;
     document.head.appendChild(style);
 }
@@ -324,6 +387,23 @@ function paint(): void {
             head.appendChild(u);
         }
         card.appendChild(head);
+
+        if (strip.items) {
+            const grid = document.createElement('div');
+            grid.className = 'livewx-legend-items';
+            for (const item of strip.items) {
+                const row = document.createElement('span');
+                row.className = 'livewx-legend-item';
+                const sw = document.createElement('span');
+                sw.className = 'livewx-legend-swatch';
+                sw.style.background = item.color;
+                row.append(sw, item.label);
+                grid.appendChild(row);
+            }
+            card.appendChild(grid);
+            frag.appendChild(card);
+            continue;
+        }
 
         const ramp = document.createElement('div');
         ramp.className = 'livewx-legend-ramp';

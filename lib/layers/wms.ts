@@ -46,6 +46,13 @@ export type ArcgisExportOpts = {
     layers?: string;
     /** ImageServer raster function name (from rasterFunctionInfos). */
     rasterFunction?: string;
+    /**
+     * Render DPI (ArcGIS default 96). ArcGIS derives map scale from it, so a
+     * lower value draws scale-limited layers at coarser zooms.
+     */
+    dpi?: number;
+    /** Ignored by ArcGIS; changing it makes MapLibre and the browser fetch fresh tiles. */
+    cacheKey?: string | number;
 };
 
 /**
@@ -74,6 +81,8 @@ export function arcgisExportTileUrl(
         // Literal JSON — viaProxy applies a single encodeURIComponent pass.
         parts.push(`renderingRule={"rasterFunction":"${opts.rasterFunction}"}`);
     }
+    if (opts.dpi) parts.push(`dpi=${opts.dpi}`);
+    if (opts.cacheKey != null) parts.push(`_=${opts.cacheKey}`);
     return viaProxy(`${base}/${path}?${parts.join('&')}`);
 }
 
@@ -90,6 +99,7 @@ export function ensureRasterLayer(
     tileUrl: string,
     opacity = 0.7,
     beforeId?: string,
+    zoom: { minzoom?: number; maxzoom?: number } = {},
 ): void {
     const tiles = tileUrl.startsWith('/') || tileUrl.includes(PROXY_PATH)
         ? [tileUrl]
@@ -106,7 +116,9 @@ export function ensureRasterLayer(
         type: 'raster',
         tiles,
         tileSize: 256,
-        maxzoom: 12,
+        // Below minzoom MapLibre requests and draws nothing.
+        ...(zoom.minzoom != null ? { minzoom: zoom.minzoom } : {}),
+        maxzoom: zoom.maxzoom ?? 12,
     });
     map.addLayer({
         id: layerId,

@@ -32,6 +32,8 @@ export const MAPSERVICES_NWS = 'https://mapservices.weather.noaa.gov';
 export const RAINVIEWER_MAXZOOM = 7;
 /** GeoMet radar is ~1 km; overzoom beyond this. */
 export const CANADA_MAXZOOM = 10;
+/** NOAA National Water Model map services (experimental, lower 48). */
+export const NWM_SERVICES = 'https://maps.water.noaa.gov/server/rest/services/nwm';
 
 export const STORAGE_KEY = 'livewx-radar-settings';
 export const REFRESH_MS = 60_000;

@@ -26,6 +26,12 @@ export function convertPrecip(mm: number, units: UnitSystem): { value: number; u
     return { value: round2(mm / 25.4), unit: 'in' };
 }
 
+/** River flow from cubic feet per second. */
+export function convertFlow(cfs: number, units: UnitSystem): { value: number; unit: string } {
+    if (units === 'metric') return { value: cfs * 0.0283168, unit: 'm³/s' };
+    return { value: cfs, unit: 'cfs' };
+}
+
 export function convertPressure(hPa: number, units: UnitSystem): { value: number; unit: string } {
     if (units === 'us') return { value: round2(hPa * 0.02953), unit: 'inHg' };
     return { value: round1(hPa), unit: 'hPa' };

@@ -41,7 +41,7 @@ Foldable groups with consent dialogs, map keys, and status lines:
 
 Spot & stations · Wind · Storms · Fire · Rain & rivers · Ocean · Snow · Ground · Alerts
 
-Includes fire weather outlook/zones, stations, smoke/AQI/PSPS/ERC, flash flood outlook, river gauges, rain totals, debris flow, buoys, SST, hurricanes, storm reports, tornado paths, avalanche, snow depth, earthquakes, spot forecasts, satellite/wind/rain pictures (WMS stand-ins for NOMADS GRIB).
+Includes fire weather outlook/zones, stations, smoke/AQI/PSPS/ERC, flash flood outlook, river gauges, NWM flooded ground and streams running high (now and 5-day), rain totals, debris flow, buoys, SST, hurricanes, storm reports, tornado paths, avalanche, snow depth, earthquakes, spot forecasts, satellite/wind/rain pictures (WMS stand-ins for NOMADS GRIB).
 
 ### Pages
 
