@@ -1,7 +1,7 @@
 /**
  * Registers map layers kept for the master pane (priority + pruned More).
  */
-import { MAPSERVICES_NWS } from '../core/constants.ts';
+import { MAPSERVICES_NWS, NWM_SERVICES } from '../core/constants.ts';
 import type { LiveWxMap } from '../core/map-types.ts';
 import { mapOf } from '../core/map-host.ts';
 import { state } from '../core/state.ts';
@@ -9,6 +9,12 @@ import { RIPPLE_ICON } from '../core/map-icons.ts';
 import { createGeoLayer, arcgisQueryUrl, mapEnvelope } from './geo-layer.ts';
 import { getLayerOpacity, registerLayer } from './registry.ts';
 import { registerFireOutlookLayer } from './fire-outlook.ts';
+import {
+    highFlowStatus,
+    startHighFlowExtras,
+    stopHighFlowExtras,
+    type HighFlowId,
+} from './high-flow.ts';
 import { registerFuelMoistureLayer } from './fuels.ts';
 import { registerMetarLayer } from './metars.ts';
 import { registerRainGaugesLayer } from './rain-gauges.ts';
@@ -43,6 +49,8 @@ function registerWmsLayer(opts: {
     maxzoom?: number;
     /** Re-request tiles this often while on (tileUrl should change with time). */
     refreshMs?: number;
+    /** Extra behavior while on (tap details, summaries); start runs again on restore. */
+    extras?: { start: () => void; stop: () => void; status: () => string };
 }): void {
     const defaultOpacity = opts.opacity ?? 0.65;
     let running = false;
@@ -65,6 +73,7 @@ function registerWmsLayer(opts: {
             running = true;
             const m = mapOf();
             if (m) optsRestore(m);
+            opts.extras?.start();
             if (opts.refreshMs && !timer) {
                 timer = setInterval(() => {
                     const map = mapOf();
@@ -78,11 +87,16 @@ function registerWmsLayer(opts: {
                 clearInterval(timer);
                 timer = null;
             }
+            opts.extras?.stop();
             const m = mapOf();
             if (m) removeRaster(m, opts.sourceId, opts.layerId);
         },
-        restore: (map) => { if (running) optsRestore(map); },
-        status: () => (running ? 'On' : 'Off'),
+        restore: (map) => {
+            if (!running) return;
+            optsRestore(map);
+            opts.extras?.start();
+        },
+        status: () => (running ? (opts.extras?.status() ?? 'On') : 'Off'),
     });
 
     function optsRestore(map: LiveWxMap): void {
@@ -97,9 +111,6 @@ function registerWmsLayer(opts: {
         );
     }
 }
-
-/** NOAA National Water Model map services (experimental, lower 48). */
-const NWM_SERVICES = 'https://maps.water.noaa.gov/server/rest/services/nwm';
 
 /**
  * Flooded-ground extent only draws at 1:400,000 or finer, which with 96 dpi
@@ -150,6 +161,7 @@ function registerNwmLayers(): void {
             service: 'ana_high_flow_magnitude',
             dpi: HIGH_FLOW_DPI,
             refreshMs: NWM_NOW_REFRESH_MS,
+            highFlow: true,
         },
         {
             id: 'high_flow_5day',
@@ -158,9 +170,20 @@ function registerNwmLayers(): void {
             service: 'mrf_nbm_5day_max_high_flow_magnitude',
             dpi: HIGH_FLOW_DPI,
             refreshMs: NWM_5DAY_REFRESH_MS,
+            highFlow: true,
         },
-    ];
+    ] as Array<{
+        id: string;
+        label: string;
+        description: string;
+        service: string;
+        dpi: number;
+        minzoom?: number;
+        refreshMs: number;
+        highFlow?: boolean;
+    }>;
     for (const l of layers) {
+        const hf = l.id as HighFlowId;
         registerWmsLayer({
             id: l.id,
             group: 'more',
@@ -175,6 +198,13 @@ function registerNwmLayers(): void {
             minzoom: l.minzoom,
             maxzoom: NWM_MAXZOOM,
             refreshMs: l.refreshMs,
+            extras: l.highFlow
+                ? {
+                    start: () => startHighFlowExtras(hf),
+                    stop: () => stopHighFlowExtras(hf),
+                    status: () => highFlowStatus(hf),
+                }
+                : undefined,
         });
     }
 }
