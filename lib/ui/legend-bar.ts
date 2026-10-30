@@ -36,6 +36,10 @@ const MENU_ORDER = [
     'smoke',
     'air_quality',
     'flash_flood',
+    'flood_now',
+    'flood_5day',
+    'high_flow_now',
+    'high_flow_5day',
     'rain_gauges',
     'snow_depth',
 ] as const;
@@ -43,6 +47,11 @@ const MENU_ORDER = [
 const RAIN_COLORS = [
     '#0018ff', '#00a0ff', '#00ffc8', '#00e000', '#ffff00', '#ff9000', '#ff0000', '#ff00ff', '#ffffff',
 ];
+
+/** NWM flooded-ground fill, as drawn by the service. */
+const FLOOD_EXTENT_COLORS = ['#006ec8', '#006ec8'];
+/** NWM high-flow grades, commonest to rarest (>50%, 50, 20, 10, 4, 2% chance a year). */
+const HIGH_FLOW_COLORS = ['#b4fff2', '#39efff', '#2ec6ff', '#1400ff', '#9e00ff', '#ff00e5'];
 
 const LEGENDS: Record<string, LegendStrip> = {
     radar_overlay: {
@@ -185,6 +194,38 @@ const LEGENDS: Record<string, LegendStrip> = {
         min: 'Slight',
         mid: 'Moderate',
         max: 'High',
+    },
+    flood_now: {
+        id: 'flood_now',
+        label: 'Flooded Ground (Now)',
+        colors: FLOOD_EXTENT_COLORS,
+        min: 'Modeled',
+        max: 'water over banks',
+    },
+    flood_5day: {
+        id: 'flood_5day',
+        label: 'Flooded Ground (5 Days)',
+        colors: FLOOD_EXTENT_COLORS,
+        min: 'Modeled',
+        max: 'peak water over banks',
+    },
+    high_flow_now: {
+        id: 'high_flow_now',
+        label: 'Streams Running High (Now)',
+        unit: 'flow',
+        colors: HIGH_FLOW_COLORS,
+        min: '1-in-2 yr',
+        mid: '1-in-10',
+        max: '1-in-50 yr',
+    },
+    high_flow_5day: {
+        id: 'high_flow_5day',
+        label: 'Streams Running High (5 Days)',
+        unit: 'peak flow',
+        colors: HIGH_FLOW_COLORS,
+        min: '1-in-2 yr',
+        mid: '1-in-10',
+        max: '1-in-50 yr',
     },
     snow_depth: {
         id: 'snow_depth',

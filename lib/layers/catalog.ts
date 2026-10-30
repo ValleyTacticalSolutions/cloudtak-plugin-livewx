@@ -39,9 +39,14 @@ function registerWmsLayer(opts: {
     layerId: string;
     tileUrl: () => string;
     opacity?: number;
+    minzoom?: number;
+    maxzoom?: number;
+    /** Re-request tiles this often while on (tileUrl should change with time). */
+    refreshMs?: number;
 }): void {
     const defaultOpacity = opts.opacity ?? 0.65;
     let running = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
     registerLayer({
         id: opts.id,
         group: opts.group,
@@ -56,9 +61,23 @@ function registerWmsLayer(opts: {
                 m.setPaintProperty?.(opts.layerId, 'raster-opacity', opacity);
             }
         },
-        start: () => { running = true; const m = mapOf(); if (m) optsRestore(m); },
+        start: () => {
+            running = true;
+            const m = mapOf();
+            if (m) optsRestore(m);
+            if (opts.refreshMs && !timer) {
+                timer = setInterval(() => {
+                    const map = mapOf();
+                    if (running && map) optsRestore(map);
+                }, opts.refreshMs);
+            }
+        },
         stop: () => {
             running = false;
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
             const m = mapOf();
             if (m) removeRaster(m, opts.sourceId, opts.layerId);
         },
@@ -73,7 +92,90 @@ function registerWmsLayer(opts: {
             opts.layerId,
             opts.tileUrl(),
             getLayerOpacity(opts.id),
+            undefined,
+            { minzoom: opts.minzoom, maxzoom: opts.maxzoom },
         );
+    }
+}
+
+/** NOAA National Water Model map services (experimental, lower 48). */
+const NWM_SERVICES = 'https://maps.water.noaa.gov/server/rest/services/nwm';
+
+/**
+ * Flooded-ground extent only draws at 1:400,000 or finer, which with 96 dpi
+ * 256 px tiles is zoom 11+. Asking at 24 dpi makes ArcGIS see each tile as 4x
+ * finer, so water shows from zoom 9.
+ */
+const FLOOD_EXTENT_DPI = 24;
+const FLOOD_EXTENT_MINZOOM = 9;
+/** Stream reaches are 1 pt lines; 144 dpi draws them 2 px wide. */
+const HIGH_FLOW_DPI = 144;
+const NWM_MAXZOOM = 14;
+/** Analysis runs hourly; the 5-day forecast every 6 hours. */
+const NWM_NOW_REFRESH_MS = 15 * 60_000;
+const NWM_5DAY_REFRESH_MS = 60 * 60_000;
+
+function nwmTileUrl(service: string, dpi: number, refreshMs: number): string {
+    return arcgisExportTileUrl(`${NWM_SERVICES}/${service}/MapServer`, 'map', {
+        layers: 'show:0',
+        dpi,
+        cacheKey: Math.floor(Date.now() / refreshMs),
+    });
+}
+
+function registerNwmLayers(): void {
+    const layers = [
+        {
+            id: 'flood_now',
+            label: 'Flooded Ground (Now)',
+            description: 'NWM inundation analysis (experimental; zoom in to see)',
+            service: 'ana_inundation_extent',
+            dpi: FLOOD_EXTENT_DPI,
+            minzoom: FLOOD_EXTENT_MINZOOM,
+            refreshMs: NWM_NOW_REFRESH_MS,
+        },
+        {
+            id: 'flood_5day',
+            label: 'Flooded Ground (5 Days)',
+            description: 'NWM 5-day max inundation forecast (experimental; zoom in to see)',
+            service: 'mrf_nbm_5day_max_inundation_extent',
+            dpi: FLOOD_EXTENT_DPI,
+            minzoom: FLOOD_EXTENT_MINZOOM,
+            refreshMs: NWM_5DAY_REFRESH_MS,
+        },
+        {
+            id: 'high_flow_now',
+            label: 'Streams Running High (Now)',
+            description: 'NWM high flow magnitude analysis (experimental)',
+            service: 'ana_high_flow_magnitude',
+            dpi: HIGH_FLOW_DPI,
+            refreshMs: NWM_NOW_REFRESH_MS,
+        },
+        {
+            id: 'high_flow_5day',
+            label: 'Streams Running High (5 Days)',
+            description: 'NWM 5-day max high flow forecast (experimental)',
+            service: 'mrf_nbm_5day_max_high_flow_magnitude',
+            dpi: HIGH_FLOW_DPI,
+            refreshMs: NWM_5DAY_REFRESH_MS,
+        },
+    ];
+    for (const l of layers) {
+        registerWmsLayer({
+            id: l.id,
+            group: 'more',
+            label: l.label,
+            description: l.description,
+            hosts: ['maps.water.noaa.gov'],
+            sends: 'Tiles',
+            sourceId: `livewx-${l.id}-src`,
+            layerId: `livewx-${l.id}-lyr`,
+            tileUrl: () => nwmTileUrl(l.service, l.dpi, l.refreshMs),
+            opacity: 0.8,
+            minzoom: l.minzoom,
+            maxzoom: NWM_MAXZOOM,
+            refreshMs: l.refreshMs,
+        });
     }
 }
 
@@ -198,6 +300,7 @@ export function registerCatalogLayers(): void {
         ),
     });
 
+    registerNwmLayers();
     registerRainGaugesLayer();
     registerFuelMoistureLayer();
     registerSpotRequestsLayer();

@@ -313,6 +313,12 @@
                         :for='`m-${row.id}`'
                     >{{ row.label }}</label>
                 </div>
+                <p
+                    v-if='enabled[row.id] && row.hint'
+                    class='sec-meta mb-1'
+                >
+                    {{ row.hint }}
+                </p>
                 <div
                     v-if='enabled[row.id] && row.opacity'
                     class='opacity-row'
@@ -388,7 +394,10 @@ const windRows = [
     { id: 'surface_wind', label: 'Surface Wind' },
 ];
 
-const moreRows = [
+const FLOOD_HINT = 'Experimental NWS model estimate, lower 48. Zoom in to county level to see it.';
+const HIGH_FLOW_HINT = 'Experimental NWS model estimate, lower 48.';
+
+const moreRows: Array<{ id: string; label: string; opacity: boolean; hint?: string }> = [
     { id: 'fire_outlook', label: 'Fire Outlook', opacity: false },
     { id: 'fw_zones', label: 'Fire Zones', opacity: false },
     { id: 'fuel_moisture', label: 'Fuel Moisture', opacity: false },
@@ -397,6 +406,10 @@ const moreRows = [
     { id: 'metars', label: 'METAR', opacity: false },
     { id: 'flash_flood', label: 'Flash Flood', opacity: false },
     { id: 'river_gauges', label: 'River Gauges', opacity: false },
+    { id: 'flood_now', label: 'Flooded Ground (Now)', opacity: true, hint: FLOOD_HINT },
+    { id: 'flood_5day', label: 'Flooded Ground (5 Days)', opacity: true, hint: FLOOD_HINT },
+    { id: 'high_flow_now', label: 'Streams Running High (Now)', opacity: true, hint: HIGH_FLOW_HINT },
+    { id: 'high_flow_5day', label: 'Streams Running High (5 Days)', opacity: true, hint: HIGH_FLOW_HINT },
     { id: 'rain_gauges', label: 'Rain Gauges', opacity: false },
     { id: 'buoys', label: 'Buoys', opacity: false },
     { id: 'hurricanes', label: 'Hurricanes', opacity: false },
