@@ -99,7 +99,7 @@ function lzwDecode(input: string): string {
 
 function prune(): void {
     const cutoff = Date.now() - STALE_MS;
-    strikes = strikes.filter((s) => s.timeMs >= cutoff);
+    strikes = strikes.filter(s => s.timeMs >= cutoff);
 }
 
 async function loadWsCtor(): Promise<(new (url: string) => WsLike) | null> {
@@ -137,7 +137,9 @@ async function connectUpstream(): Promise<void> {
         return;
     }
     if (upstream) {
-        try { upstream.close(); } catch { /* ignore */ }
+        try {
+            upstream.close();
+        } catch { /* ignore */ }
         upstream = null;
     }
     const url = WS_SERVERS[upstreamIdx % WS_SERVERS.length];
@@ -158,7 +160,9 @@ async function connectUpstream(): Promise<void> {
 
     const onOpen = () => {
         connected = true;
-        try { upstream?.send(JSON.stringify({ a: 111 })); } catch { /* ignore */ }
+        try {
+            upstream?.send(JSON.stringify({ a: 111 }));
+        } catch { /* ignore */ }
     };
     const onMessage = (...args: unknown[]) => {
         try {
@@ -166,8 +170,8 @@ async function connectUpstream(): Promise<void> {
             const raw = typeof data === 'string'
                 ? data
                 : (data && typeof data === 'object' && 'data' in (data as object)
-                    ? String((data as { data: unknown }).data)
-                    : String(data));
+                        ? String((data as { data: unknown }).data)
+                        : String(data));
             const decoded = lzwDecode(raw);
             const rec = JSON.parse(decoded) as { lat?: number; lon?: number; time?: number };
             if (typeof rec.lat !== 'number' || typeof rec.lon !== 'number') return;
@@ -187,7 +191,9 @@ async function connectUpstream(): Promise<void> {
     };
     const onError = () => {
         connected = false;
-        try { upstream?.close(); } catch { /* ignore */ }
+        try {
+            upstream?.close();
+        } catch { /* ignore */ }
     };
 
     if (typeof sock.on === 'function') {
@@ -241,7 +247,7 @@ export default async function router(schema: Schema, config: ConfigStateless) {
             await ensureUpstream();
             prune();
             const since = Number(req.query.since) || 0;
-            const out = strikes.filter((s) => s.timeMs > since);
+            const out = strikes.filter(s => s.timeMs > since);
             res.json({
                 connected,
                 attribution: 'Lightning data © Blitzortung.org & contributors (CC BY-SA 4.0)',
@@ -280,7 +286,7 @@ export default async function router(schema: Schema, config: ConfigStateless) {
             const upstreamHref = encodeUpstreamUrl(raw);
             const upstreamRes = await fetch(upstreamHref, {
                 headers: {
-                    Accept: 'application/geo+json, application/json, image/*, */*',
+                    'Accept': 'application/geo+json, application/json, image/*, */*',
                     // Ask for an uncompressed body: on some CloudTAK API runtimes
                     // fetch() hands back gzip bytes undecoded and without the
                     // upstream content-type, which breaks JSON parsing in the client.
