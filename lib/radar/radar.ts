@@ -247,8 +247,12 @@ function applyTiles(map: LiveWxMap): void {
     raiseLightningLayer();
 }
 
-function coversRadar(layer: StyleLayer): boolean {
-    if (layer.id.startsWith('livewx-')) return false;
+function isLiveWxLayer(layer: StyleLayer): boolean {
+    return layer.id.startsWith('livewx-');
+}
+
+function coversOverlays(layer: StyleLayer): boolean {
+    if (isLiveWxLayer(layer)) return false;
     if (COVERING_TYPES.has(layer.type)) return true;
     // Vector basemap land/water fills; CoT and GeoJSON fills have no source-layer
     return layer.type === 'fill' && Boolean(layer['source-layer']);
@@ -256,27 +260,28 @@ function coversRadar(layer: StyleLayer): boolean {
 
 /**
  * CloudTAK swaps basemaps by removing and re-adding the overlay's layers
- * (no style.load), which can land them above the radar. Lift the radar
- * back over the highest covering layer.
+ * (no style.load), which can land them above the radar and every other
+ * LiveWX overlay (NWM, WMS, alerts). Lift any LiveWX layer below the
+ * highest covering layer back over it, keeping their relative order.
  */
-function keepRadarAboveBasemap(): void {
+function keepOverlaysAboveBasemap(): void {
     raiseRaf = 0;
-    if (!state.overlayEnabled) return;
     const map = mapOf();
     const layers = map?.getStyle?.()?.layers;
     if (!map || !layers) return;
-    const radarIdx = layers.findIndex((l) => l.id === RADAR_LAYER_ID);
-    if (radarIdx < 0) return;
     let top = -1;
-    for (let i = layers.length - 1; i > radarIdx; i--) {
-        if (coversRadar(layers[i])) {
+    for (let i = layers.length - 1; i >= 0; i--) {
+        if (coversOverlays(layers[i])) {
             top = i;
             break;
         }
     }
     if (top < 0) return;
+    const covered = layers.slice(0, top).filter(isLiveWxLayer);
+    if (!covered.length) return;
+    const beforeId = layers[top + 1]?.id;
     try {
-        map.moveLayer?.(RADAR_LAYER_ID, layers[top + 1]?.id);
+        for (const layer of covered) map.moveLayer?.(layer.id, beforeId);
         stackAlertLayers(map);
         raiseLightningLayer();
     } catch {
@@ -285,7 +290,7 @@ function keepRadarAboveBasemap(): void {
 }
 
 function onStyleData(): void {
-    if (!raiseRaf) raiseRaf = requestAnimationFrame(keepRadarAboveBasemap);
+    if (!raiseRaf) raiseRaf = requestAnimationFrame(keepOverlaysAboveBasemap);
 }
 
 function ensureRadarLayer(map: LiveWxMap): void {
