@@ -2,7 +2,7 @@
 
 CloudTAK weather plugin with Atmosphere-class features: point forecast, grouped map layers (fire, hydro, marine, storms, snow), IEM/RainViewer radar, nationwide NWS watches & warnings, and live lightning via a CloudTAK relay.
 
-Requires CloudTAK **13.102** or newer. Apache-2.0 clean-room implementation (not a fork of the AGPL Atmosphere ATAK plugin).
+Requires CloudTAK **13.124** or newer (OXLint/TS7 API image; Auth.security token schemes from 13.123). Apache-2.0 clean-room implementation (not a fork of the AGPL Atmosphere ATAK plugin).
 
 ## What it does
 

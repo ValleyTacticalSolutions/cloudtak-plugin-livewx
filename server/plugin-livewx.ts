@@ -241,9 +241,10 @@ export default async function router(schema: Schema, config: ConfigStateless) {
                 timeMs: Type.Integer(),
             })),
         }),
+        security: Auth.security({ token: true }),
     }, async (req, res) => {
         try {
-            await Auth.as_user(config, req, { token: true });
+            await Auth.is_auth(config, req);
             await ensureUpstream();
             prune();
             const since = Number(req.query.since) || 0;
@@ -268,9 +269,10 @@ export default async function router(schema: Schema, config: ConfigStateless) {
             // Required for MapLibre raster tiles (cannot set Authorization headers).
             token: Type.Optional(Type.String()),
         }),
+        security: Auth.security({ token: true }),
     }, async (req, res) => {
         try {
-            await Auth.as_user(config, req, { token: true });
+            await Auth.is_auth(config, req);
             const raw = String(req.query.url || '');
             let host: string;
             try {
@@ -353,7 +355,7 @@ function encodeUpstreamUrl(raw: string): string {
     if (q < 0) return raw;
     const base = raw.slice(0, q);
     const query = raw.slice(q + 1);
-    const parts = [];
+    const parts: string[] = [];
     for (const part of query.split('&')) {
         if (!part) continue;
         const eq = part.indexOf('=');
