@@ -243,11 +243,21 @@ const LEGENDS: Record<string, LegendStrip> = {
     },
 };
 
-const STYLE_ID = 'livewx-legend-bar-style-v3';
+const STYLE_ID = 'livewx-legend-bar-style-v4';
+
+/**
+ * CloudTAK mounts GPS Set-Location and draw-tool boards as `.generic-bottom-pane`
+ * siblings of the MapLibre container (see Map.vue / GenericBottomPane.vue).
+ * Those boards share the bottom-center with our legend, so we hide while they are open.
+ */
+const HOST_BOTTOM_PANE = '.generic-bottom-pane';
 
 let mapRef: LiveWxMap | null = null;
 let root: HTMLDivElement | null = null;
 let stopWatch: WatchStopHandle | null = null;
+/** True while CloudTAK shows a bottom-center GPS / draw board. */
+let hostBottomOpen = false;
+let hostObserver: MutationObserver | null = null;
 
 function resolve(v: LabelFn | undefined, units: UnitSystem): string {
     if (v == null) return '';
@@ -358,9 +368,39 @@ function ensureStyle(): void {
     document.head.appendChild(style);
 }
 
+function mapShell(map: LiveWxMap | null = mapRef): HTMLElement | null {
+    return map?.getContainer?.()?.parentElement ?? null;
+}
+
+function isHostBottomOpen(shell: HTMLElement | null): boolean {
+    return Boolean(shell?.querySelector(HOST_BOTTOM_PANE));
+}
+
+function unbindHostChrome(): void {
+    hostObserver?.disconnect();
+    hostObserver = null;
+    hostBottomOpen = false;
+}
+
+/** Watch CloudTAK map-shell children for GPS Set-Location / draw bottom boards. */
+function bindHostChrome(map: LiveWxMap): void {
+    unbindHostChrome();
+    const shell = mapShell(map);
+    if (!shell) return;
+    hostBottomOpen = isHostBottomOpen(shell);
+    // childList only — MapLibre mutates inside the map container constantly.
+    hostObserver = new MutationObserver(() => {
+        const next = isHostBottomOpen(shell);
+        if (next === hostBottomOpen) return;
+        hostBottomOpen = next;
+        paint();
+    });
+    hostObserver.observe(shell, { childList: true });
+}
+
 function paint(): void {
     if (!root) return;
-    const strips = state.legendsVisible ? activeStrips() : [];
+    const strips = state.legendsVisible && !hostBottomOpen ? activeStrips() : [];
     if (!strips.length) {
         root.hidden = true;
         root.replaceChildren();
@@ -448,12 +488,14 @@ export function attachLegendBar(map?: LiveWxMap | null): void {
     const m = map ?? mapOf();
     if (!m) return;
     if (mapRef === m && root?.parentElement) {
+        bindHostChrome(m);
         paint();
         return;
     }
     detachLegendBar();
     mapRef = m;
     ensureRoot(m);
+    bindHostChrome(m);
     paint();
     if (!stopWatch) {
         stopWatch = watch(
@@ -476,6 +518,7 @@ export function attachLegendBar(map?: LiveWxMap | null): void {
             restore: (map) => {
                 mapRef = map;
                 ensureRoot(map);
+                bindHostChrome(map);
                 paint();
             },
             destroy: () => detachLegendBar(),
@@ -487,6 +530,7 @@ export function attachLegendBar(map?: LiveWxMap | null): void {
 export function detachLegendBar(): void {
     stopWatch?.();
     stopWatch = null;
+    unbindHostChrome();
     root?.remove();
     root = null;
     mapRef = null;
