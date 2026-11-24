@@ -23,6 +23,13 @@
                     >
                         {{ state.legendsVisible ? 'Hide Legends' : 'Show Legends' }}
                     </button>
+                    <button
+                        class='btn btn-sm btn-outline-secondary livewx-legends-btn'
+                        type='button'
+                        @click='toggleRadarAgeVisible()'
+                    >
+                        {{ state.radarAgeVisible ? 'Hide Radar Time' : 'Show Radar Time' }}
+                    </button>
                     <TablerIconButton
                         v-if='backType === "close"'
                         title='Close'
@@ -74,7 +81,7 @@ import {
 
 import { useRouter } from 'vue-router';
 import { computed } from 'vue';
-import { state, toggleLegendsVisible } from '../core/state.ts';
+import { state, toggleLegendsVisible, toggleRadarAgeVisible } from '../core/state.ts';
 
 const router = useRouter();
 

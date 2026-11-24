@@ -1,6 +1,8 @@
 import type { LiveWxMap } from './map-types.ts';
 import { SURFACE_BG, SURFACE_BORDER, SURFACE_FG } from './theme.ts';
 import { radarUpdatedLabel } from '../radar/tiles.ts';
+import { watch } from 'vue';
+import { state } from './state.ts';
 
 const STYLE_ID = 'livewx-age-control-style';
 const TICK_MS = 15_000;
@@ -40,13 +42,15 @@ function ensureStyle(): void {
 
 function paint(): void {
     if (!el) return;
-    if (!visible) {
+    if (!visible || !state.radarAgeVisible) {
         el.hidden = true;
         return;
     }
     el.hidden = false;
     el.textContent = radarUpdatedLabel(stamp);
 }
+
+watch(() => state.radarAgeVisible, () => paint());
 
 function startTick(): void {
     if (tick) return;

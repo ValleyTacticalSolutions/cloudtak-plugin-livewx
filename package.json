@@ -1,6 +1,6 @@
 {
   "name": "cloudtak-plugin-livewx",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "type": "module",
   "description": "CloudTAK plugin — Atmosphere-class weather: forecast, radar, alerts, lightning, fire/hydro/marine layers",
   "license": "Apache-2.0",

@@ -66,6 +66,8 @@ export interface PersistedSettings {
     consentedSources: string[];
     /** Bottom map legend strips. */
     legendsVisible: boolean;
+    /** "Radar updated X min ago" map badge. */
+    radarAgeVisible: boolean;
     /** Observed rain totals window: 1h | 6h | 24h | 72h | 7d */
     rainTotalsWindow: string;
     /** Spot Forecasts page filters. */
@@ -115,6 +117,7 @@ function load(): PersistedSettings {
         radarProvider: 'iem',
         consentedSources: [],
         legendsVisible: true,
+        radarAgeVisible: true,
         rainTotalsWindow: '24h',
         spotScope: 'office',
         spotRadiusMi: 50,
@@ -166,6 +169,7 @@ function load(): PersistedSettings {
                 : [],
             // Default on when key missing (first load after this feature).
             legendsVisible: parsed.legendsVisible === undefined ? true : Boolean(parsed.legendsVisible),
+            radarAgeVisible: parsed.radarAgeVisible === undefined ? true : Boolean(parsed.radarAgeVisible),
             rainTotalsWindow: normalizeRainWindow(parsed.rainTotalsWindow),
             spotScope: normalizeSpotScope(parsed.spotScope),
             spotRadiusMi: clamp(Number(parsed.spotRadiusMi), 1, 500, defaults.spotRadiusMi),
@@ -261,6 +265,7 @@ function payload(): PersistedSettings {
         radarProvider: state.radarProvider,
         consentedSources: state.consentedSources,
         legendsVisible: state.legendsVisible,
+        radarAgeVisible: state.radarAgeVisible,
         rainTotalsWindow: state.rainTotalsWindow,
         spotScope: state.spotScope,
         spotRadiusMi: state.spotRadiusMi,
@@ -282,6 +287,15 @@ export function setLegendsVisible(visible: boolean): void {
 
 export function toggleLegendsVisible(): void {
     setLegendsVisible(!state.legendsVisible);
+}
+
+export function setRadarAgeVisible(visible: boolean): void {
+    state.radarAgeVisible = visible;
+    persist();
+}
+
+export function toggleRadarAgeVisible(): void {
+    setRadarAgeVisible(!state.radarAgeVisible);
 }
 
 export function persist(): void {
