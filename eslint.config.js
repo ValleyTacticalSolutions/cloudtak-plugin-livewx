@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 
 export default tseslint.config(
     {
-        ignores: ['eslint.config.js', 'node_modules', 'dist'],
+        ignores: ['eslint.config.js', 'node_modules', 'dist', 'dist-bundle', 'release', 'scripts', 'vite.bundle.config.ts'],
         languageOptions: {
             sourceType: 'module',
             parserOptions: {

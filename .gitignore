@@ -3,3 +3,5 @@ dist/
 *.log
 .DS_Store
 radar_sites_raw.json
+dist-bundle/
+release/

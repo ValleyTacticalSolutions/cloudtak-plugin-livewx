@@ -72,6 +72,8 @@ export async function init(api: PluginAPI): Promise<void> {
 }
 
 export function destroy(): void {
+    // destroyMapHost() drops the layer modules, so the catalog must register again on the next init
+    wired = false;
     if (forecastTimer) {
         clearInterval(forecastTimer);
         forecastTimer = null;

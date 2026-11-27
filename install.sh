@@ -37,6 +37,8 @@
 set -euo pipefail
 
 INSTALL_DIR_NAME="livewx-radar"
+# Oldest CloudTAK this plugin is built and verified against (no upper limit)
+MIN_CLOUDTAK="14.4.1"
 PLUGIN_GIT_URL="${LIVEWX_GIT_URL:-https://github.com/ValleyTacticalSolutions/cloudtak-plugin-livewx.git}"
 PLUGIN_GIT_REF="${LIVEWX_GIT_REF:-main}"
 
@@ -173,6 +175,14 @@ if [ ! -d "$CT_DIR/app" ]; then
     echo "ERROR: $CT_DIR/app not found." >&2
     echo "  Plugins install into app/plugins/. That layout arrived in CloudTAK 13.102." >&2
     exit 1
+fi
+
+# Warn when the CloudTAK checkout is older than the supported minimum
+CT_VERSION="$(sed -n 's/^[[:space:]]*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*//p' "$CT_DIR/package.json" 2>/dev/null | head -n1)"
+if [ -n "$CT_VERSION" ] && [ "$(printf '%s
+%s
+' "$MIN_CLOUDTAK" "$CT_VERSION" | sort -V | head -n1)" != "$MIN_CLOUDTAK" ]; then
+    echo "WARNING: CloudTAK v$CT_VERSION is older than the supported minimum v$MIN_CLOUDTAK; the plugin may not work." >&2
 fi
 
 PLUGIN_DEST="$CT_DIR/app/plugins/$INSTALL_DIR_NAME"

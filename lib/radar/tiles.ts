@@ -1,4 +1,6 @@
 import { CONUS_SITE_ID, IEM_JSON_BASE, IEM_TMS_BASE, PROTOCOL_NAME } from '../core/constants.ts';
+import { viaProxy } from '../core/egress.ts';
+import { apiFetch } from '../core/host.ts';
 import { filterImageData } from './palette.ts';
 import { knownProductCodes, siteCode } from './products.ts';
 import type { FilterKind, RadarProduct } from './products.ts';
@@ -27,7 +29,12 @@ type AddProtocol = (
     handler: (params: ProtocolParams, abort?: AbortController) => Promise<{ data: ArrayBuffer | ImageBitmap | ImageData }>,
 ) => void;
 
+/** Set by vite.bundle.config.ts: the runtime bundle carries its own maplibre copy, whose protocol registry the host map never sees */
+declare const __CLOUDTAK_BUNDLE__: boolean | undefined;
+
 async function maplibreModule(): Promise<{ addProtocol?: AddProtocol; removeProtocol?: (name: string) => void } | null> {
+    // Bundle build: no custom protocol, so the radar falls back to plain proxied tiles (no min-value filter)
+    if (typeof __CLOUDTAK_BUNDLE__ !== 'undefined' && __CLOUDTAK_BUNDLE__) return null;
     try {
         const ml = await import('maplibre-gl') as {
             addProtocol?: AddProtocol;
@@ -89,7 +96,7 @@ async function handleProtocol(
     parsed.searchParams.delete('k');
 
     const blob = await cachedBlob(cacheKey(parsed), async () => {
-        const response = await fetch(parsed.toString());
+        const response = await apiFetch(viaProxy(parsed.toString()), { raw: true });
         if (!response.ok) {
             throw new Error(`Radar tile HTTP ${response.status}`);
         }
@@ -188,7 +195,8 @@ export function tileUrl(req: TileRequest, useProtocol: boolean): string {
     if (useProtocol) {
         return path.replace('https://', `${PROTOCOL_NAME}://`);
     }
-    return path;
+    // Tiles go through the CloudTAK proxy (token in the query) so they load in the apps too
+    return viaProxy(path);
 }
 
 export function mosaicLoopStamps(): string[] {
@@ -202,7 +210,7 @@ export function mosaicLoopStamps(): string[] {
 export async function fetchAvailableProducts(iemId: string): Promise<string[] | null> {
     try {
         const url = `${IEM_JSON_BASE}/radar.py?operation=available&radar=${encodeURIComponent(iemId)}`;
-        const res = await fetch(url);
+        const res = await apiFetch(viaProxy(url), { raw: true });
         if (!res.ok) return null;
         const body = await res.json() as unknown;
         return extractProductCodes(body);
@@ -253,7 +261,7 @@ export async function fetchSiteScans(
             + `&product=${encodeURIComponent(productCode)}`
             + `&start=${encodeURIComponent(startIso)}`
             + `&end=${encodeURIComponent(endIso)}`;
-        const res = await fetch(url);
+        const res = await apiFetch(viaProxy(url), { raw: true });
         if (!res.ok) return [];
         const body = await res.json() as unknown;
         return extractScans(body);
@@ -335,7 +343,7 @@ export function shortAgeLabel(at: number, now = Date.now()): string {
 
 export async function fetchMosaicValidAt(): Promise<number | null> {
     try {
-        const res = await fetch(`${IEM_JSON_BASE}/tms.py`);
+        const res = await apiFetch(viaProxy(`${IEM_JSON_BASE}/tms.py`), { raw: true });
         if (!res.ok) return null;
         const body = await res.json() as {
             services?: Array<{ id?: string; utc_valid?: string; layername?: string }>;

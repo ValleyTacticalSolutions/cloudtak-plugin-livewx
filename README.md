@@ -2,7 +2,7 @@
 
 CloudTAK weather plugin with Atmosphere-class features: point forecast, grouped map layers (fire, hydro, marine, storms, snow), IEM/RainViewer radar, nationwide NWS watches & warnings, and live lightning via a CloudTAK relay.
 
-Requires CloudTAK **13.124** or newer (OXLint/TS7 API image; Auth.security token schemes from 13.123). Apache-2.0 clean-room implementation (not a fork of the AGPL Atmosphere ATAK plugin).
+**Minimum CloudTAK: v14.4.1**. Built and verified against CloudTAK v14.4.1 (commit 184ecb2, 2026-11-27). There is no upper limit, and newer CloudTAK versions are expected to work. Please report breakage as an issue. Independent clean-room implementation (not a fork of the Atmosphere ATAK plugin).
 
 ## What it does
 
@@ -91,11 +91,35 @@ Symlink this checkout to `CloudTAK/app/plugins/livewx-radar`, copy or symlink `s
 - Weather hosts are contacted from the browser when CORS allows; otherwise use `/api/livewx/proxy?url=…` (allowlisted hosts only).
 - You no longer need Blitzortung hosts in CSP.
 
+## Mobile (CloudTAK iOS/Android app)
+
+The mobile bundle needs **CloudTAK v14.4.1 or newer** (runtime plugins, the same minimum as the compiled Marketplace install).
+
+The native apps only run runtime bundles, not plugins compiled into the web build. The bundle covers the web half only, so **the server-side install is still required**: `install.sh` copies `api/stateless/routes/plugin-livewx.ts` (the weather proxy and the Blitzortung lightning relay) and rebuilds the API image. Without it the bundle loads but forecasts, layers and lightning fail.
+
+1. Build: `npm install && npm run bundle` creates `release/livewx-<version>.tar.gz` (`manifest.json` + `index.js`).
+2. Upload (CloudTAK admin): `POST /api/plugin/bundle` with the tar.gz.
+3. On the phone: **Settings → Plugins**, then load LiveWX.
+
+The bundle contains everything except `vue`, `vue-router` and `@tak-ps/vue-tabler`, which the app provides. All requests go to the CloudTAK server with the session token, and links open in the system browser. Detail cards close by tapping them. In the bundle the radar minimum-value filter is off (it needs a map protocol the host map cannot share); radar tiles are otherwise unchanged.
+
+## Core imports
+
+The plugin imports nothing from CloudTAK's `src/`. It reads the host Pinia store, server URL and token through `lib/core/host.ts`.
+
+## Development
+
+`bash verify-cloudtak.sh . livewx-radar` builds the plugin inside the latest CloudTAK `main` (ESLint, `vue-tsc`, Vite build, API oxlint and `tsc`).
+
 ## Accepted deltas vs ATAK Atmosphere
 
 - Wind / smoke / model rain / waves use **WMS/TMS pictures**, not on-device GRIB particle fields
 - General NWS WWA are **kept** (Atmosphere omits them for a companion IPAWS plugin)
 - No CoT publish for weather features
+
+## License
+
+AGPL-3.0-or-later. See `LICENSE`. Third-party material keeps its own license, as noted under Attribution.
 
 ## Attribution
 

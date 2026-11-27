@@ -1,54 +1,20 @@
 /**
- * CloudTAK session token for same-origin /api/* calls.
+ * CloudTAK session token and server base URL for /api/* calls.
+ * Works in the web build (page origin is the server) and in the iOS/Android apps
+ * (page origin is the app, so API paths must be made absolute).
  * Auth requires Authorization: Bearer or ?token= (see api/common/auth.ts).
  */
+import { serverUrl, token } from './host.ts';
 
 let cached: string | undefined;
+let base = '';
 let lastRefresh = 0;
 const REFRESH_MS = 30_000;
 
-type PrefsPlugin = {
-    get: (opts: { key: string }) => Promise<{ value: string | null }>;
-};
-
-function capacitorPreferences(): PrefsPlugin | null {
-    try {
-        const Cap = (globalThis as { Capacitor?: { Plugins?: { Preferences?: PrefsPlugin } } }).Capacitor;
-        return Cap?.Plugins?.Preferences ?? null;
-    } catch {
-        return null;
-    }
-}
-
-function fromLocalStorage(): string | undefined {
-    try {
-        // Capacitor Preferences web default group prefix is "CapacitorStorage."
-        for (const key of ['CapacitorStorage.token', 'token', '_cap_token']) {
-            const v = localStorage.getItem(key);
-            if (v) return v;
-        }
-    } catch {
-        /* ignore */
-    }
-    return undefined;
-}
-
-async function readToken(): Promise<string | undefined> {
-    const prefs = capacitorPreferences();
-    if (prefs) {
-        try {
-            const { value } = await prefs.get({ key: 'token' });
-            if (value) return value;
-        } catch {
-            /* fall through */
-        }
-    }
-    return fromLocalStorage();
-}
-
-/** Refresh the cached token (call on plugin init and before layer starts). */
+/** Refresh the cached token and server URL (call on plugin init and before layer starts). */
 export async function refreshAuthToken(): Promise<string | undefined> {
-    cached = await readToken();
+    cached = await token();
+    base = await serverUrl();
     lastRefresh = Date.now();
     return cached;
 }
@@ -70,13 +36,20 @@ export function authHeaders(extra?: Record<string, string>): Record<string, stri
     return out;
 }
 
+/** Make a server-relative path absolute against the CloudTAK server (needs a prior refreshAuthToken). */
+export function absoluteUrl(url: string): string {
+    if (!url.startsWith('/')) return url;
+    return `${base || location.origin}${url}`;
+}
+
 /**
- * Append ?token= / &token= for MapLibre tile requests (CloudTAK fonts use the same pattern).
+ * Absolute URL with ?token= / &token= for MapLibre tile requests (CloudTAK fonts use the same pattern).
  * Prefer Authorization headers for fetch(); use this when the browser cannot set headers.
  */
 export function withAuthQuery(url: string): string {
+    const abs = absoluteUrl(url);
     const t = authToken();
-    if (!t) return url;
-    if (/[?&]token=/.test(url)) return url;
-    return `${url}${url.includes('?') ? '&' : '?'}token=${encodeURIComponent(t)}`;
+    if (!t) return abs;
+    if (/[?&]token=/.test(abs)) return abs;
+    return `${abs}${abs.includes('?') ? '&' : '?'}token=${encodeURIComponent(t)}`;
 }

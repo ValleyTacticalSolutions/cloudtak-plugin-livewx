@@ -1,27 +1,43 @@
 {
   "name": "cloudtak-plugin-livewx",
-  "version": "2.0.3",
+  "version": "3.0.0",
   "type": "module",
   "description": "CloudTAK plugin — Atmosphere-class weather: forecast, radar, alerts, lightning, fire/hydro/marine layers",
-  "license": "Apache-2.0",
+  "license": "AGPL-3.0-or-later",
   "main": "index.js",
   "scripts": {
     "lint": "eslint .",
-    "check": "vue-tsc --noEmit"
+    "check": "vue-tsc --noEmit",
+    "verify": "bash verify-cloudtak.sh . livewx-radar",
+    "build:bundle": "vite build --config vite.bundle.config.ts",
+    "bundle": "npm run build:bundle && node scripts/bundle.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@tak-ps/cloudtak": "file:../../../CloudTAK/app",
-    "@tak-ps/vue-tabler": "^5.0.0",
     "@tabler/icons-vue": "^3.31.0",
+    "@tak-ps/vue-tabler": "^6.0.0",
+    "@types/geojson": "^7946.0.0",
     "@typescript-eslint/eslint-plugin": "^8.52.0",
     "@typescript-eslint/parser": "^8.52.0",
+    "@vitejs/plugin-vue": "^6.0.0",
     "eslint": "^10.0.1",
     "globals": "^17.3.0",
     "maplibre-gl": "^6.4.1",
+    "pinia": "^4.0.0",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.52.0",
+    "vite": "^8.0.0",
+    "vite-plugin-css-injected-by-js": "^3.5.0",
     "vue": "^3.5.26",
+    "vue-router": "^5.0.0",
     "vue-tsc": "^3.2.2"
+  },
+  "cloudtak": {
+    "minVersion": "14.4.1"
+  },
+  "cloudtakBundle": {
+    "name": "livewx",
+    "author": "ValleyTacticalSolutions",
+    "homepage": "https://github.com/ValleyTacticalSolutions/cloudtak-plugin-livewx"
   }
 }

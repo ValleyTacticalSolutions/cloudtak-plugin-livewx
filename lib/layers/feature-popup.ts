@@ -2,13 +2,13 @@
  * Shared MapLibre popup for LiveWX feature clicks (alerts + geo layers).
  */
 import type { LiveWxMap } from '../core/map-types.ts';
+import { openExternal } from '../core/host.ts';
 import { mapOf } from '../core/map-host.ts';
 import { pointUi } from '../core/point.ts';
 import { SURFACE_BG, SURFACE_BORDER, SURFACE_FG, SURFACE_MUTED } from '../core/theme.ts';
 
 const POPUP_STYLE_ID = 'livewx-alert-popup-style';
 const LINK_CLASS = 'livewx-popup-link';
-const LINK_WINDOW_NAME = 'livewx-link';
 const SKIP_KEYS = new Set([
     'objectid', 'fid', 'globalid', 'shape', 'shape_length', 'shape_area',
     'st_area(shape)', 'st_length(shape)', 'geometry', 'geom',
@@ -55,6 +55,13 @@ function ensurePopupStyle(): void {
     font-size: 18px;
     padding: 4px 8px;
 }
+@media (pointer: coarse) {
+    .livewx-alert-popup .maplibregl-popup-close-button {
+        min-width: 40px;
+        min-height: 40px;
+        font-size: 24px;
+    }
+}
 .livewx-alert-popup .maplibregl-popup-close-button:hover {
     color: ${SURFACE_FG};
     background: transparent;
@@ -76,7 +83,7 @@ function ensurePopupStyle(): void {
     border-left-color: ${SURFACE_BG};
 }
 .livewx-alert-card {
-    max-width: 400px;
+    max-width: min(400px, 90vw);
     /* Cap height so tall cards (e.g. METAR + raw) stay on the map pane. */
     max-height: min(420px, 50vh);
     overflow: auto;
@@ -225,7 +232,7 @@ export async function showFeatureHtml(
         if (!Popup) return;
         popup = new Popup({
             closeButton: true,
-            maxWidth: '420px',
+            maxWidth: 'min(420px, 92vw)',
             className: 'livewx-alert-popup',
             anchor: popupAnchor(map, lngLat),
             offset: 12,
@@ -306,26 +313,10 @@ export type LinkWindowOpts = {
     maxHeight?: number;
 };
 
-/** Open a URL in a small, centered, reused browser window (new tab where popups are unsupported). */
+/** Open a URL in the system browser (popup windows do not work in the mobile apps). */
 export function openLinkWindow(url: string, opts: LinkWindowOpts = {}): void {
-    const sw = window.screen?.availWidth || window.innerWidth;
-    const sh = window.screen?.availHeight || window.innerHeight;
-    const width = Math.min(opts.maxWidth ?? 900, Math.round(sw * 0.8));
-    const height = Math.min(opts.maxHeight ?? 700, Math.round(sh * 0.8));
-    const left = Math.max(0, Math.round((sw - width) / 2));
-    const top = Math.max(0, Math.round((sh - height) / 2));
-    const win = window.open(
-        url,
-        opts.name ?? LINK_WINDOW_NAME,
-        `popup,width=${width},height=${height},left=${left},top=${top}`,
-    );
-    if (!win) {
-        // Popup blocked — fall back to a normal new tab.
-        window.open(url, '_blank', 'noopener,noreferrer');
-        return;
-    }
-    try { win.opener = null; } catch { /* ignore */ }
-    win.focus();
+    void opts;
+    openExternal(url);
 }
 
 /**
@@ -336,7 +327,11 @@ function onLinkClick(e: MouseEvent): void {
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     const target = e.target as Element | null;
     const a = target?.closest?.(`a.${LINK_CLASS}`) as HTMLAnchorElement | null;
-    if (!a?.href) return;
+    if (!a?.href) {
+        // Tap anywhere on a detail card to dismiss it (the close button is small on touch screens)
+        if (target?.closest?.('.livewx-alert-card')) closeFeaturePopup();
+        return;
+    }
     e.preventDefault();
     openLinkWindow(a.href);
 }

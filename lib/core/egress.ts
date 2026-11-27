@@ -3,6 +3,8 @@
  * Requests must carry the CloudTAK session (Bearer or ?token=).
  */
 import { authHeaders, authToken, refreshAuthToken, withAuthQuery } from './auth-token.ts';
+import { BLITZ_RELAY_PATH } from './constants.ts';
+import { apiFetch } from './host.ts';
 
 export const COORD_DECIMALS = 3;
 export const PROXY_PATH = '/api/livewx/proxy';
@@ -65,7 +67,7 @@ export function hostAllowed(url: string): boolean {
 }
 
 /**
- * Wrap an absolute HTTPS URL (optionally with MapLibre tokens) in the same-origin proxy.
+ * Wrap an absolute HTTPS URL (optionally with MapLibre tokens) in the CloudTAK server proxy.
  * Includes ?token= so MapLibre tile fetches authenticate (fonts use the same pattern).
  */
 export function viaProxy(url: string): string {
@@ -86,16 +88,19 @@ export type FetchJsonOpts = {
 };
 
 async function doFetch(url: string, opts: FetchJsonOpts): Promise<Response> {
-    const sameOrigin = url.startsWith('/') || url.includes(PROXY_PATH) || Boolean(opts.sameOrigin);
+    const sameOrigin = url.startsWith('/') || url.includes(PROXY_PATH) || url.includes(BLITZ_RELAY_PATH) || Boolean(opts.sameOrigin);
     // Refresh token before authenticated API calls so a stale cache does not 401.
     if (sameOrigin) await refreshAuthToken();
+    const headers = {
+        Accept: 'application/geo+json, application/json, image/*, */*',
+        ...opts.headers,
+    };
+    // CloudTAK server calls carry the bearer token and use the server URL, not the app origin.
+    if (sameOrigin) return apiFetch(url, { raw: true, signal: opts.signal, headers });
     return fetch(url, {
         signal: opts.signal,
-        credentials: sameOrigin ? 'same-origin' : 'omit',
-        headers: authHeaders({
-            Accept: 'application/geo+json, application/json, image/*, */*',
-            ...opts.headers,
-        }),
+        credentials: 'omit',
+        headers: authHeaders(headers),
     });
 }
 
@@ -119,7 +124,7 @@ export async function fetchJson<T = unknown>(url: string, opts: FetchJsonOpts = 
     }
     const res = await doFetch(target, {
         ...opts,
-        sameOrigin: target.startsWith('/') || Boolean(opts.sameOrigin),
+        sameOrigin: target.startsWith('/') || target.includes(PROXY_PATH) || Boolean(opts.sameOrigin),
     });
     if (!res.ok) {
         if (res.status === 401) {
@@ -134,7 +139,7 @@ export async function fetchText(url: string, opts: FetchJsonOpts = {}): Promise<
     const target = resolveFetchUrl(url, opts);
     const res = await doFetch(target, {
         ...opts,
-        sameOrigin: target.startsWith('/') || Boolean(opts.sameOrigin),
+        sameOrigin: target.startsWith('/') || target.includes(PROXY_PATH) || Boolean(opts.sameOrigin),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.text();
@@ -151,7 +156,7 @@ export async function fetchBytes(url: string, opts: FetchJsonOpts = {}): Promise
     }
     const res = await doFetch(target, {
         ...opts,
-        sameOrigin: target.startsWith('/') || Boolean(opts.sameOrigin),
+        sameOrigin: target.startsWith('/') || target.includes(PROXY_PATH) || Boolean(opts.sameOrigin),
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.arrayBuffer();

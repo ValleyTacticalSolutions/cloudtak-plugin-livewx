@@ -4,6 +4,7 @@
  * Display protocol adapted from https://github.com/cmlaird/CloudTAK-Plugin-Lightning (MIT).
  * Data: Blitzortung.org & contributors (CC BY-SA 4.0) — entertainment / SA only.
  */
+import { apiFetch } from '../core/host.ts';
 import { reactive } from 'vue';
 import type { PluginAPI } from '@tak-ps/cloudtak';
 import {
@@ -364,12 +365,11 @@ function onStrike(lat: number, lon: number, timeMs: number): void {
 async function pollRelay(): Promise<void> {
     if (!running) return;
     try {
-        const { authHeaders, refreshAuthToken, withAuthQuery } = await import('../core/auth-token.ts');
+        const { refreshAuthToken } = await import('../core/auth-token.ts');
         await refreshAuthToken();
-        const url = withAuthQuery(`${BLITZ_RELAY_PATH}?since=${sinceMs}`);
-        const res = await fetch(url, {
-            headers: authHeaders({ Accept: 'application/json' }),
-            credentials: 'same-origin',
+        const res = await apiFetch(`${BLITZ_RELAY_PATH}?since=${sinceMs}`, {
+            raw: true,
+            headers: { Accept: 'application/json' },
         });
         if (!res.ok) {
             lightning.connected = false;
