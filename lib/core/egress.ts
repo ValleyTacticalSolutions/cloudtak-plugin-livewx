@@ -106,6 +106,8 @@ async function proxyGet(url: string, opts: FetchJsonOpts): Promise<ProxyReply> {
             method: 'GET',
             headers: {
                 Accept: 'application/geo+json, application/json, text/*, */*',
+                // api.weather.gov rejects requests without a User-Agent.
+                'User-Agent': 'CloudTAK-LiveWX-plugin',
                 ...opts.headers,
             },
         },

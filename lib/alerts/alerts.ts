@@ -92,16 +92,44 @@ function emptyCollection(): AlertCollection {
     return { type: 'FeatureCollection', features: [] };
 }
 
+/**
+ * CloudTAK's proxy rejects responses over 1 MB, and the NWS national
+ * "active alerts" feed is several MB. Request it in event-filtered groups so
+ * each response stays small, then merge. Zone-only alerts (no polygon) were
+ * already dropped below, so nothing visible is lost.
+ */
+const EVENT_GROUPS: string[][] = [
+    ['Tornado Warning', 'Severe Thunderstorm Warning'],
+    ['Flash Flood Warning', 'Special Marine Warning', 'Extreme Wind Warning'],
+    ['Tornado Watch', 'Severe Thunderstorm Watch', 'Flash Flood Watch'],
+    ['Flood Warning', 'Flood Watch', 'Blizzard Warning', 'Winter Storm Warning', 'Winter Storm Watch', 'Ice Storm Warning'],
+    ['Hurricane Warning', 'Hurricane Watch', 'Tropical Storm Warning', 'Tropical Storm Watch',
+        'Storm Warning', 'Storm Watch', 'Red Flag Warning', 'Fire Weather Watch'],
+];
+
 async function fetchAlerts(): Promise<AlertCollection> {
     const { fetchJson } = await import('../core/egress.ts');
-    const body = await fetchJson<AlertCollection>(NWS_ALERTS_URL, {
-        headers: { Accept: 'application/geo+json' },
-    });
-    const features = (body.features ?? []).filter((f) => {
+    const results = await Promise.allSettled(EVENT_GROUPS.map((events) => {
+        const url = `${NWS_ALERTS_URL}?status=actual&event=${events.map(encodeURIComponent).join(',')}`;
+        return fetchJson<AlertCollection>(url, { headers: { Accept: 'application/geo+json' } });
+    }));
+    const ok = results.filter((r): r is PromiseFulfilledResult<AlertCollection> => r.status === 'fulfilled');
+    if (!ok.length) {
+        const first = results.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+        throw first?.reason instanceof Error ? first.reason : new Error('Failed to load watches/warnings');
+    }
+    const seen = new Set<string>();
+    const features = ok.flatMap((r) => r.value.features ?? []).filter((f) => {
         const event = f.properties?.event ?? '';
         if (!isWatchOrWarning(event)) return false;
         if (!f.geometry) return false;
-        return f.geometry.type === 'Polygon' || f.geometry.type === 'MultiPolygon';
+        if (f.geometry.type !== 'Polygon' && f.geometry.type !== 'MultiPolygon') return false;
+        const id = String((f as { id?: unknown }).id ?? '');
+        if (id) {
+            if (seen.has(id)) return false;
+            seen.add(id);
+        }
+        return true;
     }).map((f) => ({
         ...f,
         properties: {
