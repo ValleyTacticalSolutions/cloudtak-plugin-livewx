@@ -1,10 +1,9 @@
 /**
- * Bridge existing radar/alerts/Blitzortung toggles into the layer catalog.
+ * Bridge existing radar/alerts toggles into the layer catalog.
  */
 import { startAlerts, stopAlerts } from '../alerts/alerts.ts';
 import { getApi } from '../core/map-host.ts';
 import { persist, state } from '../core/state.ts';
-import { applyLightning } from '../lightning/lightning.ts';
 import { registerLayer } from './registry.ts';
 
 export function registerBridgeLayers(): void {
@@ -31,29 +30,6 @@ export function registerBridgeLayers(): void {
             if (state.alertsEnabled && api) startAlerts(api);
         },
         status: () => (state.alertsEnabled ? `${state.alertCount}` : 'Off'),
-    });
-
-    registerLayer({
-        id: 'blitzortung',
-        group: 'alerts',
-        label: 'Lightning',
-        description: 'Blitzortung Live Strikes',
-        hosts: ['(relay)'],
-        sends: 'Relay poll',
-        start: () => {
-            state.lightningEnabled = true;
-            persist();
-            applyLightning();
-        },
-        stop: () => {
-            state.lightningEnabled = false;
-            persist();
-            applyLightning();
-        },
-        restore: () => {
-            if (state.lightningEnabled) applyLightning();
-        },
-        status: () => (state.lightningEnabled ? 'Live' : 'Off'),
     });
 
     registerLayer({

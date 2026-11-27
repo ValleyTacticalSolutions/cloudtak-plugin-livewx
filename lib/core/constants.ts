@@ -54,8 +54,6 @@ export const WSR88D_RANGE_KM = 230;
 /** TDWR reflectivity / Doppler range (48 nmi). */
 export const TDWR_RANGE_KM = 90;
 
-/** Same-origin path for Blitzortung relay (CloudTAK server plugin). */
-export const BLITZ_RELAY_PATH = '/api/livewx/lightning';
 
 /** In-plugin views: master home + detail screens with Back. */
 export type AppPageId = 'home' | 'forecast' | 'radar' | 'spot';

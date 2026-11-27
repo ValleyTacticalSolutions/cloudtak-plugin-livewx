@@ -236,20 +236,15 @@ else
     mkdir -p "$CT_DIR/app/plugins"
 
     rm -rf "$PLUGIN_DEST"
-    mkdir -p "$PLUGIN_DEST/lib" "$PLUGIN_DEST/data" "$PLUGIN_DEST/server"
+    mkdir -p "$PLUGIN_DEST/lib" "$PLUGIN_DEST/data"
     cp "$SOURCE_DIR/index.ts" "$SOURCE_DIR/package.json" "$SOURCE_DIR/tsconfig.json" \
         "$SOURCE_DIR/eslint.config.js" "$SOURCE_DIR/env.d.ts" "$PLUGIN_DEST/"
     cp -R "$SOURCE_DIR/lib/." "$PLUGIN_DEST/lib/"
     cp -R "$SOURCE_DIR/data/." "$PLUGIN_DEST/data/"
-    if [ -f "$SOURCE_DIR/server/$SERVER_ROUTE_SRC_NAME" ]; then
-        cp "$SOURCE_DIR/server/$SERVER_ROUTE_SRC_NAME" "$PLUGIN_DEST/server/"
-        if [ -d "$CT_DIR/api/stateless/routes" ]; then
-            cp "$SOURCE_DIR/server/$SERVER_ROUTE_SRC_NAME" "$SERVER_ROUTE_DEST"
-            echo "Installed server route: api/stateless/routes/$SERVER_ROUTE_SRC_NAME"
-            echo "  (Blitzortung relay + CORS proxy — required for live lightning)"
-        else
-            echo "WARNING: $CT_DIR/api/stateless/routes not found — client plugin installed without relay." >&2
-        fi
+    # Older versions installed a server route; the plugin no longer needs one
+    if [ -f "$SERVER_ROUTE_DEST" ]; then
+        rm -f "$SERVER_ROUTE_DEST"
+        echo "Removed old server route: api/stateless/routes/$SERVER_ROUTE_SRC_NAME"
     fi
     echo "Installed plugin: app/plugins/$INSTALL_DIR_NAME"
     echo "  source: $SOURCE_DIR"

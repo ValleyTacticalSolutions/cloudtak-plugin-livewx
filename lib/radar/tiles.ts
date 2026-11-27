@@ -1,5 +1,5 @@
 import { CONUS_SITE_ID, IEM_JSON_BASE, IEM_TMS_BASE, PROTOCOL_NAME } from '../core/constants.ts';
-import { viaProxy } from '../core/egress.ts';
+import { fetchJson, viaProxy } from '../core/egress.ts';
 import { apiFetch } from '../core/host.ts';
 import { filterImageData } from './palette.ts';
 import { knownProductCodes, siteCode } from './products.ts';
@@ -210,9 +210,7 @@ export function mosaicLoopStamps(): string[] {
 export async function fetchAvailableProducts(iemId: string): Promise<string[] | null> {
     try {
         const url = `${IEM_JSON_BASE}/radar.py?operation=available&radar=${encodeURIComponent(iemId)}`;
-        const res = await apiFetch(viaProxy(url), { raw: true });
-        if (!res.ok) return null;
-        const body = await res.json() as unknown;
+        const body = await fetchJson<unknown>(url);
         return extractProductCodes(body);
     } catch {
         return null;
@@ -261,9 +259,7 @@ export async function fetchSiteScans(
             + `&product=${encodeURIComponent(productCode)}`
             + `&start=${encodeURIComponent(startIso)}`
             + `&end=${encodeURIComponent(endIso)}`;
-        const res = await apiFetch(viaProxy(url), { raw: true });
-        if (!res.ok) return [];
-        const body = await res.json() as unknown;
+        const body = await fetchJson<unknown>(url);
         return extractScans(body);
     } catch {
         return [];
@@ -343,11 +339,9 @@ export function shortAgeLabel(at: number, now = Date.now()): string {
 
 export async function fetchMosaicValidAt(): Promise<number | null> {
     try {
-        const res = await apiFetch(viaProxy(`${IEM_JSON_BASE}/tms.py`), { raw: true });
-        if (!res.ok) return null;
-        const body = await res.json() as {
+        const body = await fetchJson<{
             services?: Array<{ id?: string; utc_valid?: string; layername?: string }>;
-        };
+        }>(`${IEM_JSON_BASE}/tms.py`);
         const services = body.services ?? [];
         const prefer = services.find((s) => /n0q/i.test(`${s.id ?? ''} ${s.layername ?? ''}`))
             ?? services[0];

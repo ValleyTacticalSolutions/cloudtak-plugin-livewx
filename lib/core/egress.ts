@@ -1,13 +1,14 @@
 /**
- * Single HTTPS egress path: allowlisted hosts via CloudTAK /api/livewx/proxy.
- * Requests must carry the CloudTAK session (Bearer or ?token=).
+ * Single HTTPS egress path through CloudTAK itself, no server route needed:
+ * data requests use `POST /api/proxy`, map tiles use `GET /api/proxy/image`.
+ * Requests carry the CloudTAK session (Bearer or ?token=).
  */
-import { authHeaders, authToken, refreshAuthToken, withAuthQuery } from './auth-token.ts';
-import { BLITZ_RELAY_PATH } from './constants.ts';
+import { refreshAuthToken, withAuthQuery } from './auth-token.ts';
 import { apiFetch } from './host.ts';
 
 export const COORD_DECIMALS = 3;
-export const PROXY_PATH = '/api/livewx/proxy';
+/** CloudTAK image proxy, used for map tile URLs (no whitelist needed for public origins). */
+export const PROXY_PATH = '/api/proxy/image';
 
 /** Hosts the plugin may contact from the browser (or via proxy). */
 export const ALLOWED_HOSTS = new Set([
@@ -67,7 +68,7 @@ export function hostAllowed(url: string): boolean {
 }
 
 /**
- * Wrap an absolute HTTPS URL (optionally with MapLibre tokens) in the CloudTAK server proxy.
+ * Wrap an absolute HTTPS image/tile URL (optionally with MapLibre tokens) in CloudTAK's image proxy.
  * Includes ?token= so MapLibre tile fetches authenticate (fonts use the same pattern).
  */
 export function viaProxy(url: string): string {
@@ -81,85 +82,66 @@ export function viaProxy(url: string): string {
 export type FetchJsonOpts = {
     signal?: AbortSignal;
     headers?: Record<string, string>;
-    /** When true, skip host allowlist (same-origin CloudTAK API only). */
-    sameOrigin?: boolean;
-    /** Skip proxy (for same-origin or already-proxied URLs). */
-    noProxy?: boolean;
 };
 
-async function doFetch(url: string, opts: FetchJsonOpts): Promise<Response> {
-    const sameOrigin = url.startsWith('/') || url.includes(PROXY_PATH) || url.includes(BLITZ_RELAY_PATH) || Boolean(opts.sameOrigin);
-    // Refresh token before authenticated API calls so a stale cache does not 401.
-    if (sameOrigin) await refreshAuthToken();
-    const headers = {
-        Accept: 'application/geo+json, application/json, image/*, */*',
-        ...opts.headers,
-    };
-    // CloudTAK server calls carry the bearer token and use the server URL, not the app origin.
-    if (sameOrigin) return apiFetch(url, { raw: true, signal: opts.signal, headers });
-    return fetch(url, {
+type ProxyReply = {
+    status: number;
+    headers: Record<string, string>;
+    body: unknown;
+    encoding?: string;
+};
+
+/**
+ * GET through CloudTAK's own `POST /api/proxy` (server-side request). The CloudTAK admin must
+ * enable the proxy and whitelist the origin. Responses are capped at 1 MB by CloudTAK.
+ */
+async function proxyGet(url: string, opts: FetchJsonOpts): Promise<ProxyReply> {
+    if (!hostAllowed(url)) throw new Error(`Host not allowlisted: ${url}`);
+    await refreshAuthToken();
+    const reply = await apiFetch('/api/proxy', {
+        method: 'POST',
         signal: opts.signal,
-        credentials: 'omit',
-        headers: authHeaders(headers),
-    });
+        body: {
+            url,
+            method: 'GET',
+            headers: {
+                Accept: 'application/geo+json, application/json, text/*, */*',
+                ...opts.headers,
+            },
+        },
+    }) as ProxyReply;
+    if (reply.status < 200 || reply.status >= 300) throw new Error(`HTTP ${reply.status}`);
+    return reply;
 }
 
-function resolveFetchUrl(url: string, opts: FetchJsonOpts): string {
-    if (opts.sameOrigin || opts.noProxy || url.startsWith('/') || url.includes(PROXY_PATH)) {
-        return withAuthQuery(url);
-    }
-    if (!hostAllowed(url)) {
-        throw new Error(`Host not allowlisted: ${url}`);
-    }
-    return viaProxy(url);
+function decodeBase64(b64: string): Uint8Array {
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
 }
 
 export async function fetchJson<T = unknown>(url: string, opts: FetchJsonOpts = {}): Promise<T> {
-    const target = resolveFetchUrl(url, opts);
-    if (target.includes(PROXY_PATH) && !authToken()) {
-        await refreshAuthToken();
-        if (!authToken()) {
-            throw new Error('Not signed in — CloudTAK token required for weather proxy');
-        }
+    const reply = await proxyGet(url, opts);
+    if (reply.encoding === 'base64') {
+        return JSON.parse(new TextDecoder().decode(decodeBase64(String(reply.body)))) as T;
     }
-    const res = await doFetch(target, {
-        ...opts,
-        sameOrigin: target.startsWith('/') || target.includes(PROXY_PATH) || Boolean(opts.sameOrigin),
-    });
-    if (!res.ok) {
-        if (res.status === 401) {
-            throw new Error('HTTP 401 — re-login or redeploy server route with token auth');
-        }
-        throw new Error(`HTTP ${res.status}`);
-    }
-    return res.json() as Promise<T>;
+    return (typeof reply.body === 'string' ? JSON.parse(reply.body) : reply.body) as T;
 }
 
 export async function fetchText(url: string, opts: FetchJsonOpts = {}): Promise<string> {
-    const target = resolveFetchUrl(url, opts);
-    const res = await doFetch(target, {
-        ...opts,
-        sameOrigin: target.startsWith('/') || target.includes(PROXY_PATH) || Boolean(opts.sameOrigin),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.text();
+    const reply = await proxyGet(url, opts);
+    if (reply.encoding === 'base64') return new TextDecoder().decode(decodeBase64(String(reply.body)));
+    return typeof reply.body === 'string' ? reply.body : JSON.stringify(reply.body);
 }
 
-/** Fetch raw bytes (e.g. gzipped AWC cache files) through the same proxy path. */
+/** Fetch raw bytes (e.g. gzipped AWC cache files) through the same proxy. */
 export async function fetchBytes(url: string, opts: FetchJsonOpts = {}): Promise<ArrayBuffer> {
-    const target = resolveFetchUrl(url, opts);
-    if (target.includes(PROXY_PATH) && !authToken()) {
-        await refreshAuthToken();
-        if (!authToken()) {
-            throw new Error('Not signed in — CloudTAK token required for weather proxy');
-        }
-    }
-    const res = await doFetch(target, {
-        ...opts,
-        sameOrigin: target.startsWith('/') || target.includes(PROXY_PATH) || Boolean(opts.sameOrigin),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return res.arrayBuffer();
+    const reply = await proxyGet(url, opts);
+    const bytes = reply.encoding === 'base64'
+        ? decodeBase64(String(reply.body))
+        : new TextEncoder().encode(typeof reply.body === 'string' ? reply.body : JSON.stringify(reply.body));
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
 }
 
 export function ageLabelMs(at: number | null | undefined): string {

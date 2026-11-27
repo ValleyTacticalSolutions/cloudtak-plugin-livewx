@@ -225,35 +225,6 @@
             <h3 class='sec-title mb-2'>
                 Lightning
             </h3>
-            <div class='form-check form-switch mb-2'>
-                <input
-                    id='m-ltng'
-                    class='form-check-input'
-                    type='checkbox'
-                    :checked='enabled.blitzortung'
-                    @change='toggle("blitzortung", $event)'
-                >
-                <label
-                    class='form-check-label'
-                    for='m-ltng'
-                >Lightning</label>
-            </div>
-            <template v-if='enabled.blitzortung'>
-                <label
-                    class='form-label small mb-1'
-                    for='m-ltng-life'
-                >Lifetime {{ state.lightningStaleSec }}s</label>
-                <input
-                    id='m-ltng-life'
-                    class='form-range mb-2'
-                    type='range'
-                    min='15'
-                    max='600'
-                    step='15'
-                    :value='state.lightningStaleSec'
-                    @input='onLifetime'
-                >
-            </template>
             <div class='layer-row'>
                 <div class='form-check form-switch mb-0'>
                     <input
@@ -371,7 +342,7 @@
 <script setup lang='ts'>
 import { computed, onMounted } from 'vue';
 import { ageLabelMs } from '../../core/egress.ts';
-import { setLightningStaleSec, setPage, state } from '../../core/state.ts';
+import { setPage, state } from '../../core/state.ts';
 import { forecast } from '../../forecast/engine.ts';
 import { listSources } from '../../forecast/sources.ts';
 import {
@@ -430,7 +401,6 @@ const allIds = [
     ...radarRows.map((r) => r.id),
     ...windRows.map((r) => r.id),
     'nws_wwa',
-    'blitzortung',
     'lightning_density',
     ...moreRows.map((r) => r.id),
 ];
@@ -443,7 +413,6 @@ const enabled = computed(() => {
     }
     if (state.overlayEnabled) out.radar_overlay = true;
     if (state.alertsEnabled) out.nws_wwa = true;
-    if (state.lightningEnabled) out.blitzortung = true;
     if (state.densityLightningEnabled) out.lightning_density = true;
     return out;
 });
@@ -518,9 +487,6 @@ function go(page: 'forecast' | 'radar' | 'spot'): void {
     setPage(page);
 }
 
-function onLifetime(ev: Event): void {
-    setLightningStaleSec(Number((ev.target as HTMLInputElement).value));
-}
 </script>
 
 <style scoped>

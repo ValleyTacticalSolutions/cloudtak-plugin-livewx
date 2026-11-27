@@ -1,5 +1,5 @@
 /**
- * Plugin lifecycle: map host, layers, forecast point, radar/alerts/lightning.
+ * Plugin lifecycle: map host, layers, forecast point, radar/alerts.
  */
 import type { PluginAPI } from '@tak-ps/cloudtak';
 import { refreshAuthToken } from './core/auth-token.ts';
@@ -34,7 +34,6 @@ function ensureCatalog(): void {
 function syncLegacyLayerFlags(): void {
     const pairs: Array<[string, boolean]> = [
         ['nws_wwa', state.alertsEnabled],
-        ['blitzortung', state.lightningEnabled],
         ['radar_overlay', state.overlayEnabled],
         ['radar_sites', state.sitesOnMap],
         ['lightning_density', state.densityLightningEnabled],

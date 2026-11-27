@@ -52,7 +52,7 @@ export default class LiveWxRadar implements PluginInstance {
             label: 'LiveWX',
             route: ROUTE_NAME,
             tooltip: 'LiveWX Weather',
-            description: 'Forecast, radar, NWS alerts, lightning, fire/hydro/marine layers',
+            description: 'Forecast, radar, NWS alerts, lightning density, fire/hydro/marine layers',
             icon: IconLiveWx,
         });
     }

@@ -12,14 +12,6 @@ import {
     REFRESH_MS,
     RIDGE_MAXZOOM,
 } from '../core/constants.ts';
-import {
-    applyLightning,
-    destroyLightning,
-    initLightning,
-    raiseLightningLayer,
-    refreshLightningView,
-    restoreLightningLayers,
-} from '../lightning/lightning.ts';
 import type { LiveWxMap, StyleLayer } from '../core/map-types.ts';
 import { mapOf as hostMapOf, registerModule, unregisterModule } from '../core/map-host.ts';
 import {
@@ -244,7 +236,6 @@ function applyTiles(map: LiveWxMap): void {
         },
     }, map.getLayer(ALERT_LINE_ID) ? ALERT_LINE_ID : firstSymbolLayer(map));
     stackAlertLayers(map);
-    raiseLightningLayer();
 }
 
 function isLiveWxLayer(layer: StyleLayer): boolean {
@@ -283,7 +274,6 @@ function keepOverlaysAboveBasemap(): void {
     try {
         for (const layer of covered) map.moveLayer?.(layer.id, beforeId);
         stackAlertLayers(map);
-        raiseLightningLayer();
     } catch {
         /* style not ready */
     }
@@ -487,7 +477,6 @@ function onStyle(map: LiveWxMap): void {
     attachRadarAgeControl(map);
     if (state.alertsEnabled && apiRef) startAlerts(apiRef);
     if (state.sitesOnMap && apiRef) startSiteMarkers(apiRef, onSitePicked);
-    restoreLightningLayers();
 }
 
 function onSitePicked(id: string): void {
@@ -510,7 +499,6 @@ export function applySiteMarkers(): void {
 export async function init(api: PluginAPI): Promise<void> {
     apiRef = api;
     protocolOn = await ensureFilterProtocol();
-    initLightning(api);
     registerModule({
         id: 'radar-core',
         restore: (map) => onStyle(map),
@@ -522,7 +510,6 @@ export async function init(api: PluginAPI): Promise<void> {
     }
     if (state.alertsEnabled) startAlerts(api);
     if (state.sitesOnMap) startSiteMarkers(api, onSitePicked);
-    if (state.lightningEnabled) applyLightning();
     if (state.overlayEnabled) void setOverlayEnabled(true);
 }
 
@@ -542,7 +529,6 @@ export function destroy(): void {
     }
     stopAlerts();
     stopSiteMarkers();
-    destroyLightning();
     unregisterModule('radar-core');
     const map = mapOf();
     detachMoveEnd(map);
@@ -588,7 +574,6 @@ export async function setOverlayEnabled(enabled: boolean): Promise<void> {
 export async function applyRadarSettings(): Promise<void> {
     persist();
     refreshSiteMarkers();
-    refreshLightningView();
     if (!state.overlayEnabled) {
         state.status = statusText();
         return;
@@ -625,11 +610,6 @@ export function applyAlerts(): void {
     if (!apiRef) return;
     if (state.alertsEnabled) startAlerts(apiRef);
     else stopAlerts();
-}
-
-export function applyLightningToggle(): void {
-    persist();
-    applyLightning();
 }
 
 export async function setReplayIndex(index: number): Promise<void> {

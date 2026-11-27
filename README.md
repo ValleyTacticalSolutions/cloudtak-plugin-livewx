@@ -1,6 +1,6 @@
 # LiveWX
 
-CloudTAK weather plugin with Atmosphere-class features: point forecast, grouped map layers (fire, hydro, marine, storms, snow), IEM/RainViewer radar, nationwide NWS watches & warnings, and live lightning via a CloudTAK relay.
+CloudTAK weather plugin with Atmosphere-class features: point forecast, grouped map layers (fire, hydro, marine, storms, snow), IEM/RainViewer radar, nationwide NWS watches & warnings, and NOAA lightning density. It needs no server route and no API rebuild.
 
 **Minimum CloudTAK: v14.4.1**. Built and verified against CloudTAK v14.4.1 (commit 184ecb2, 2026-11-27). There is no upper limit, and newer CloudTAK versions are expected to work. Please report breakage as an issue. Independent clean-room implementation (not a fork of the Atmosphere ATAK plugin).
 
@@ -22,10 +22,9 @@ CloudTAK weather plugin with Atmosphere-class features: point forecast, grouped 
 - Optional **Auto** provider: RainViewer world composite outside NWS coverage
 - Opacity, min-value filter, last-hour replay, radar age control, site markers
 
-### Alerts & lightning
+### Alerts & lightning density
 
 - **Watches & warnings** from `api.weather.gov` (nationwide) — unchanged from prior LiveWX
-- **Live lightning (Blitzortung)** via CloudTAK **server relay** (clients never open Blitzortung sockets)
 - **Lightning density (NOAA)** — GOES GLM WMS, Atmosphere-style delayed density
 
 ### Spot Forecasts
@@ -47,18 +46,52 @@ Includes fire weather outlook/zones, stations, smoke/AQI/PSPS/ERC, flash flood o
 
 Forecast · Layers · Radar · Spot · Fire Weather Zones · SAWTI · Fire Danger · Weather Stations · River Gauges · Buoys · Storm Reports · Rain Gauges
 
-## Blitzortung usage
-
-[Blitzortung.org](https://www.blitzortung.org/en/contact.php) requires external apps to:
-
-- Retrieve data from a **separate server** (not Blitzortung’s hosts) — this plugin uses `/api/livewx/lightning`
-- Stay **non-commercial**, freely accessible, clearly attributed (**CC BY-SA 4.0**)
-- Not use data for storm warning / life-safety systems
-- Prevent misuse where practical
-
-The UI shows attribution and a non-warning disclaimer whenever live lightning is on. Install the server route with `install.sh` so the relay is present. Do not point browsers at `wss://ws*.blitzortung.org`.
-
 ## Install
+
+LiveWX is a plugin only: no server route and no CloudTAK rebuild. It reaches weather services through CloudTAK's own proxy.
+
+**One-time admin setup** (CloudTAK admin settings): turn on the **plugin proxy** (`proxy::enabled`) and add these origins to the proxy whitelist (`proxy::whitelist`). Map tiles go through the image proxy and need no whitelist, but the origins below also serve data:
+
+```
+https://api.weather.gov
+https://api.open-meteo.com
+https://mesonet.agron.iastate.edu
+https://mapservices.weather.noaa.gov
+https://opengeo.ncep.noaa.gov
+https://geo.weather.gc.ca
+https://api.rainviewer.com
+https://tilecache.rainviewer.com
+https://nowcoast.noaa.gov
+https://nomads.ncep.noaa.gov
+https://maps.water.noaa.gov
+https://api.water.noaa.gov
+https://www.ndbc.noaa.gov
+https://api.tidesandcurrents.noaa.gov
+https://www.nhc.noaa.gov
+https://api.avalanche.org
+https://wcc.sc.egov.usda.gov
+https://services.arcgis.com
+https://services3.arcgis.com
+https://geocoding.geo.census.gov
+https://fsapps.nwcg.gov
+https://www.nfmdb.org
+https://data.cocorahs.org
+https://waterservices.usgs.gov
+https://waterdata.usgs.gov
+https://earthquake.usgs.gov
+https://services.dat.noaa.gov
+https://gacc.nifc.gov
+https://radar.weather.gov
+https://aviationweather.gov
+```
+
+Then install the plugin from the TAK Portal marketplace, or load the runtime bundle (see Mobile). Each request uses the signed-in user's CloudTAK session.
+
+Limits of CloudTAK's proxy: responses are capped at 1 MB and requests time out after 15 s, so a very large layer or area can fail to load. The image proxy puts the session token in the tile URL, which can appear in access logs.
+
+**Not included:** live Blitzortung lightning strikes. They need a websocket relay, and CloudTAK's proxy is HTTP only. Lightning *density* (NOAA GOES GLM tiles) still works.
+
+### Manual install into a CloudTAK checkout (optional)
 
 ```bash
 git clone https://github.com/ValleyTacticalSolutions/cloudtak-plugin-livewx.git
@@ -66,36 +99,17 @@ cd cloudtak-plugin-livewx
 ./install.sh
 ```
 
-Copies into `app/plugins/livewx-radar/` and `api/stateless/routes/plugin-livewx.ts`, then rebuilds the API image. Afterward: **Settings → Refresh App**.
-
-If the whole CloudTAK UI starts returning **502** (basemap, Atlas sync, other plugins), the API container failed to boot — often from a bad `api/stateless/routes/plugin-livewx.ts`. Remove that file, rebuild/restart the API, then reinstall with a fixed copy:
-
-```bash
-rm -f "$CLOUDTAK/api/stateless/routes/plugin-livewx.ts"
-cd "$CLOUDTAK" && docker compose build --no-cache api && docker compose up -d --force-recreate api
-# then from this repo:
-./install.sh --no-pull
-```
-
-```bash
-./install.sh --remove
-```
+Copies into `app/plugins/livewx-radar/` and rebuilds the API image (the compiled install). It also removes the old `plugin-livewx.ts` server route from earlier versions. Afterward: **Settings → Refresh App**. `./install.sh --remove` uninstalls.
 
 ### Local development
 
-Symlink this checkout to `CloudTAK/app/plugins/livewx-radar`, copy or symlink `server/plugin-livewx.ts` into `api/stateless/routes/`, run `npm install` here (with `@tak-ps/cloudtak` pointing at your CloudTAK `app` package), and restart `npm run serve` in `app`.
-
-### CSP / network
-
-- Browser `connect-src` must allow same-origin `/api/livewx/*` (already `'self'` on typical CloudTAK nginx).
-- Weather hosts are contacted from the browser when CORS allows; otherwise use `/api/livewx/proxy?url=…` (allowlisted hosts only).
-- You no longer need Blitzortung hosts in CSP.
+Symlink this checkout to `CloudTAK/app/plugins/livewx-radar`, run `npm install` here, and restart `npm run serve` in `app`.
 
 ## Mobile (CloudTAK iOS/Android app)
 
 The mobile bundle needs **CloudTAK v14.4.1 or newer** (runtime plugins, the same minimum as the compiled Marketplace install).
 
-The native apps only run runtime bundles, not plugins compiled into the web build. The bundle covers the web half only, so **the server-side install is still required**: `install.sh` copies `api/stateless/routes/plugin-livewx.ts` (the weather proxy and the Blitzortung lightning relay) and rebuilds the API image. Without it the bundle loads but forecasts, layers and lightning fail.
+The native apps only run runtime bundles, not plugins compiled into the web build. The bundle needs no server route, but the one-time proxy setup under Install is required.
 
 1. Build: `npm install && npm run bundle` creates `release/livewx-<version>.tar.gz` (`manifest.json` + `index.js`).
 2. Upload (CloudTAK admin): `POST /api/plugin/bundle` with the tar.gz.
@@ -127,6 +141,6 @@ AGPL-3.0-or-later. See `LICENSE`. Third-party material keeps its own license, as
 - Forecast / alerts / many layers: [NWS API](https://www.weather.gov/documentation/services-web-api) and NOAA map services
 - Open-Meteo: [open-meteo.com](https://open-meteo.com/) (CC BY 4.0)
 - Spot forecasts: [NOAA SPOT Forecast Monitor map service](https://mapservices.weather.noaa.gov/vector/rest/services/fire_weather/nws_fire_weather_spot/MapServer) (read-only, public, ~15 min updates); forecasts and requests open on [spot.weather.gov](https://spot.weather.gov/)
-- Lightning: [Blitzortung.org](https://www.blitzortung.org/) & contributors (CC BY-SA 4.0); display adapted from [cmlaird/CloudTAK-Plugin-Lightning](https://github.com/cmlaird/CloudTAK-Plugin-Lightning) (MIT)
+- Lightning density: NOAA GOES GLM. Earlier versions showed Blitzortung strikes; that display was adapted from [cmlaird/CloudTAK-Plugin-Lightning](https://github.com/cmlaird/CloudTAK-Plugin-Lightning) (MIT)
 - Site list / product taxonomy adapted from [Supercell Wx](https://github.com/dpaulat/supercell-wx) (MIT)
 - Feature parity inspired by [takwerx/atmosphere](https://github.com/takwerx/atmosphere) (independent reimplementation)
