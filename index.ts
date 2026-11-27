@@ -1,7 +1,7 @@
 import type { App } from 'vue';
 import { h } from 'vue';
 import type { PluginAPI, PluginInstance } from '@tak-ps/cloudtak';
-import MenuTemplate from './lib/ui/MenuTemplate.vue';
+import MenuTemplate from './lib/ui/vendor/MenuTemplate.vue';
 import AppShell from './lib/ui/AppShell.vue';
 import { IconLiveWx } from './lib/ui/icon.ts';
 import { MENU_KEY, ROUTE_NAME } from './lib/core/constants.ts';

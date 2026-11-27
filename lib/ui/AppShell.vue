@@ -1,5 +1,21 @@
 <template>
     <div class='livewx-app'>
+        <div class='livewx-toggles'>
+            <button
+                class='btn btn-sm btn-outline-secondary'
+                type='button'
+                @click='toggleLegendsVisible()'
+            >
+                {{ state.legendsVisible ? 'Hide Legends' : 'Show Legends' }}
+            </button>
+            <button
+                class='btn btn-sm btn-outline-secondary'
+                type='button'
+                @click='toggleRadarAgeVisible()'
+            >
+                {{ state.radarAgeVisible ? 'Hide Radar Time' : 'Show Radar Time' }}
+            </button>
+        </div>
         <div
             v-if='state.page !== "home"'
             class='livewx-chrome'
@@ -25,7 +41,7 @@
 
 <script setup lang='ts'>
 import type { PluginAPI } from '@tak-ps/cloudtak';
-import { setPage, state } from '../core/state.ts';
+import { setPage, state, toggleLegendsVisible, toggleRadarAgeVisible } from '../core/state.ts';
 import RadarContainer from '../radar/RadarContainer.vue';
 import ForecastPage from './pages/ForecastPage.vue';
 import MasterPane from './pages/MasterPane.vue';
@@ -37,6 +53,17 @@ defineProps<{ api: PluginAPI }>();
 <style scoped>
 .livewx-app {
     color: inherit;
+}
+.livewx-toggles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+.livewx-toggles .btn {
+    white-space: nowrap;
+    font-size: 0.75rem;
+    padding: 0.15rem 0.5rem;
 }
 .livewx-chrome {
     border-bottom: 1px solid var(--cloudtak-surface-border, var(--tblr-border-color, rgba(128, 128, 128, 0.3)));
