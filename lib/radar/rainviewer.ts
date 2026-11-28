@@ -1,5 +1,7 @@
 import { RAINVIEWER_API } from '../core/constants.ts';
-import { fetchJson, viaProxy } from '../core/egress.ts';
+import { PROXY_PATH, fetchJson, viaProxy } from '../core/egress.ts';
+import { refreshAuthToken, withAuthQuery } from '../core/auth-token.ts';
+import { apiFetch } from '../core/host.ts';
 import type { ScanFrame } from './tiles.ts';
 
 type RainviewerMaps = {
@@ -22,6 +24,21 @@ export type RainviewerSnapshot = {
 let cached: RainviewerSnapshot | null = null;
 
 /**
+ * Read the RainViewer index. Prefer the data proxy; when the admin has not whitelisted
+ * api.rainviewer.com (it answers 403), fall back to the image proxy, which needs no whitelist.
+ */
+async function fetchMaps(): Promise<RainviewerMaps> {
+    try {
+        return await fetchJson<RainviewerMaps>(RAINVIEWER_API);
+    } catch {
+        await refreshAuthToken();
+        const path = withAuthQuery(`${PROXY_PATH}?url=${encodeURIComponent(RAINVIEWER_API)}`);
+        const body = await apiFetch(path);
+        return (typeof body === 'string' ? JSON.parse(body) : body) as RainviewerMaps;
+    }
+}
+
+/**
  * RainViewer public weather-maps.json: past frames (~2 h, 10 min) for replay.
  * Matches Atmosphere: use observed past only, not nowcast forecast frames.
  * Style 6 = NEXRAD Level III palette so the picture matches US mosaics at the border.
@@ -29,7 +46,7 @@ let cached: RainviewerSnapshot | null = null;
 export async function fetchRainviewerHost(): Promise<RainviewerSnapshot | null> {
     if (cached && Date.now() - cached.at < 60_000) return cached;
     try {
-        const body = await fetchJson<RainviewerMaps>(RAINVIEWER_API);
+        const body = await fetchMaps();
         // Always ask the consented tile host (Atmosphere does the same).
         const host = 'https://tilecache.rainviewer.com';
         const past = body.radar?.past ?? [];
