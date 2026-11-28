@@ -150,7 +150,9 @@ function statusText(): string {
         : (liveValidAt.value != null ? `Live · ${ageLabel(liveValidAt.value)}` : 'Live');
     const src = activeSource.value;
     if (src === 'canada') return `Canada · GeoMet · ${frame}`;
-    if (src === 'rainviewer') return `Global · RainViewer · ${frame}`;
+    if (src === 'rainviewer') {
+        return rainviewerHost ? `Global · RainViewer · ${frame}` : 'Global · RainViewer unavailable';
+    }
     const product = currentProduct();
     const site = findSite(state.siteId);
     const where = site ? (isMosaic(site.id) ? 'CONUS mosaic' : site.id) : state.siteId;
@@ -175,6 +177,13 @@ function applyTiles(map: LiveWxMap): void {
     let maxzoom: number;
     let sigBase: string;
 
+    if (src === 'rainviewer' && !rainviewerHost) {
+        // Never fall back to the US-only mosaic: it would look like Global covers only CONUS.
+        if (map.getLayer(RADAR_LAYER_ID)) map.removeLayer(RADAR_LAYER_ID);
+        if (map.getSource(RADAR_SOURCE_ID)) map.removeSource(RADAR_SOURCE_ID);
+        lastSourceSig = '';
+        return;
+    }
     if (src === 'rainviewer' && rainviewerHost) {
         // Replay uses frame stamp as RainViewer path; live uses cached host URL.
         if (state.replayIndex >= 0 && frames[state.replayIndex]) {
